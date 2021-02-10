@@ -79,9 +79,9 @@ def handle_loader():
                 pass
 
 
-def send_file_to_redis(filename, channel):
+def send_file_to_redis(filename, channel, chunksize=2048):
     # Open the file
-    file = open(filename, 'rb', buffering=2048)
+    file = open(filename, 'rb', buffering=chunksize)
     logger.debug("Opened File: " + filename)
     # Find the actual size of the file and move to the end
     st_results = os.stat(filename)
@@ -89,13 +89,18 @@ def send_file_to_redis(filename, channel):
     file.seek(st_size)
 
     while True:
-        where = file.tell()
-        line = file.read()
-        if not line:
-            time.sleep(0.1)
-            file.seek(where)
-        else:
+        line = file.read(chunksize)
+        if line:
             red.publish(channel, line)
+        else:
+            time.sleep(0.1281)
+#        where = file.tell()
+#        line = file.read()
+#        if not line:
+#            time.sleep(0.1)
+#            file.seek(where)
+#        else:
+#            red.publish(channel, line)
 
 
 if __name__ == "__main__":
