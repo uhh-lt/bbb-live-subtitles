@@ -89,8 +89,8 @@ def send_file_to_redis(filename, channel, chunksize=2048*2):
     file.seek(st_size)
 
     while True:
-        line = file.read(chunksize)
         last_read_pos = file.tell()
+        line = file.read(chunksize)
         if line:
             logger.debug("Read chunk of:" + str(len(line)) + "bytes.")
             red.publish(channel, line)
