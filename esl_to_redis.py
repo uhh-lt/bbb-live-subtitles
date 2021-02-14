@@ -62,3 +62,5 @@ if __name__ == '__main__':
     parser.add_argument("-c", "--channel", help="The Pubsub Information Channel")
     parser.add_argument("-fs", "--freeswitchServer", help="Freeswitch Server hostname or IP")
     parser.add_argument("-fp", "--freeswitchPassword", help="Freeswitch Password")
+
+    app.run()
