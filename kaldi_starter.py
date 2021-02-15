@@ -78,4 +78,4 @@ if __name__ == "__main__":
     server = args.server
     channel = args.channel
 
-    wait_for_channel(server)
+    wait_for_channel(server, channel)
