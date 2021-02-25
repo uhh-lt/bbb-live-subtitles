@@ -11,9 +11,9 @@ def start_kaldi(input, output, speaker):
     os.system("pykaldi_bbb_env/bin/python3.7 nnet3_model.py -m 0 -e -t -y models/kaldi_tuda_de_nnet3_chain2.yaml --redis-audio=%s --redis-channel=%s -s='%s' -fpc 190" % (input, output, speaker))
 
 
-def wait_for_channel(server, channel):
+def wait_for_channel(server, port, channel):
     kaldiInstances = {}
-    red = redis.Redis(host=server, port=6379, password="")
+    red = redis.Redis(host=server, port=port, password="")
     pubsub = red.pubsub()
     pubsub.subscribe(channel)
 
@@ -73,9 +73,11 @@ if __name__ == "__main__":
 
     # flag (- and --) arguments
     parser.add_argument("-s", "--server", help="REDIS Pubsub Server hostname or IP")
+    parser.add_argument("-p", "--port", help="REDIS Pubsub Port", default="6379")
     parser.add_argument("-c", "--channel", help="The Pubsub Information Channel")
     args = parser.parse_args()
     server = args.server
+    port = args.port
     channel = args.channel
 
-    wait_for_channel(server, channel)
+    wait_for_channel(server, port, channel)
