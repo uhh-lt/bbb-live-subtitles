@@ -6,9 +6,9 @@ import time
 import argparse
 
 
-def start_kaldi(input, output, speaker):
+def start_kaldi(input, output, controlChannel, speaker):
     os.chdir("/home/bbb/ba/kaldi_modelserver_bbb")
-    os.system("pykaldi_bbb_env/bin/python3.7 nnet3_model.py -m 0 -e -t -y models/kaldi_tuda_de_nnet3_chain2.yaml --redis-audio=%s --redis-channel=%s -s='%s' -fpc 190" % (input, output, speaker))
+    os.system("pykaldi_bbb_env/bin/python3.7 nnet3_model.py -m 0 -e -t -y models/kaldi_tuda_de_nnet3_chain2.yaml --redis-audio=%s --redis-channel=%s --redis-control=%s -s='%s' -fpc 190" % (input, output, controlChannel, speaker))
 
 
 def wait_for_channel(server, port, channel):
@@ -25,44 +25,61 @@ def wait_for_channel(server, port, channel):
             try:
                 meetingId = message["meetingId"]
                 callerUsername = message["Caller-Username"]
-                inputChannel = meetingId + "%" + callerUsername.replace(" ", ".") + "%asr"
-                outputChannel = meetingId + "%" + callerUsername.replace(" ", ".") + "%data"
+                channelName = meetingId + "%" + callerUsername.replace(" ", ".")
+                inputChannel = channelName + "%asr"
+                outputChannel = channelName + "%data"
+                controlChannel = channelName + "%control"
                 callerDestinationNumber = message["Caller-Destination-Number"]
                 origCallerIDName = message["Caller-Orig-Caller-ID-Name"]
                 if message["Event"] == "LOADER_START":
                     print("Start Kaldi")
-                    p = mp.Process(target=start_kaldi, args=(inputChannel, outputChannel, callerUsername))
+                    p = mp.Process(target=start_kaldi, args=(inputChannel, outputChannel, controlChannel, callerUsername))
                     p.start()
                     kaldiInstances[inputChannel] = p
 
-                    Loader_Start_msg = {
+                    Kaldi_Start_msg = {
                                         "Event": "KALDI_START",
                                         "Caller-Destination-Number": callerDestinationNumber,
                                         "meetingId": meetingId,
                                         "Caller-Orig-Caller-ID-Name": origCallerIDName,
                                         "Caller-Username": callerUsername,
                                         "Input-Channel": inputChannel,
-                                        "ASR-Channel": outputChannel
+                                        "ASR-Channel": outputChannel,
+                                        "Control-Channel": controlChannel
                                         }
-                    red.publish(channel, json.dumps(Loader_Start_msg))
+                    red.publish(channel, json.dumps(Kaldi_Start_msg))
 
                 if message["Event"] == "LOADER_STOP":
                     inputChannel = message["ASR-Channel"]
                     print("Stop Kaldi")
-                    p = kaldiInstances.pop(inputChannel, None)
-                    if p:
-                        p.terminate()  # TODO: Problems with orphaned processes. Eventually call Kaldi as a module and not with the system
-                        p.join()
-                        Loader_Stop_msg = {
-                                           "Event": "KALDI_STOP",
-                                           "Caller-Destination-Number": callerDestinationNumber,
-                                           "meetingId": meetingId,
-                                           "Caller-Orig-Caller-ID-Name": origCallerIDName,
-                                           'Caller-Username': callerUsername,
-                                           "Input-Channel": inputChannel,
-                                           "ASR-Channel": outputChannel
-                                           }
-                        red.publish(channel, json.dumps(Loader_Stop_msg))
+                    red.publish(controlChannel, "shutdown")
+                    Kaldi_Stop_msg = {
+                                        "Event": "KALDI_STOP",
+                                        "Caller-Destination-Number": callerDestinationNumber,
+                                        "meetingId": meetingId,
+                                        "Caller-Orig-Caller-ID-Name": origCallerIDName,
+                                        "Caller-Username": callerUsername,
+                                        "Input-Channel": inputChannel,
+                                        "ASR-Channel": outputChannel,
+                                        "Control-Channel": controlChannel
+                                        }
+                    red.publish(channel, json.dumps(Kaldi_Stop_msg))
+
+                    # p = kaldiInstances.pop(inputChannel, None)
+                    # if p:
+                    #     p.terminate()  # TODO: Problems with orphaned processes. Eventually call Kaldi as a module and not with the system
+                    #     p.join()
+                    #     Kaldi_Stop_msg = {
+                    #                        "Event": "KALDI_STOP",
+                    #                        "Caller-Destination-Number": callerDestinationNumber,
+                    #                        "meetingId": meetingId,
+                    #                        "Caller-Orig-Caller-ID-Name": origCallerIDName,
+                    #                        'Caller-Username': callerUsername,
+                    #                        "Input-Channel": inputChannel,
+                    #                        "ASR-Channel": outputChannel,
+                    #                        "Control-Channel": controlChannel
+                    #                        }
+                    #     red.publish(channel, json.dumps(Kaldi_Stop_msg))
             except:
                 pass
 
