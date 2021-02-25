@@ -43,7 +43,7 @@ sudo nano /opt/freeswitch/etc/freeswitch/dialplan/default/bbb_echo_to_conference
 Add the following lines above the line `jitterbuffer`:
 ```XML
       <action application="set" data="RECORD_READ_ONLY=true"/>
-      <action application="set" data="record_sample_rate=8000"/> <!-- The samplerate is doubled by FS. Perhaps a bug -->
+      <action application="set" data="record_sample_rate=8000"/> <!-- The samplerate is doubled by FS, it will write out 16kHz. Maybe writes out the Nyquist rate (2x) as output or its  a bug -->
       <action application="record_session" data="/var/freeswitch/meetings/${strftime(%Y-%m-%d-%H-%M-%S)}_${call_uuid}.wav"/>
 ```
 Save the file and restart FreeSWITCH:
