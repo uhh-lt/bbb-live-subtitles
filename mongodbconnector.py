@@ -3,6 +3,7 @@ import time
 import redis
 import json
 import logging
+import argparse
 
 from multiprocessing import Manager
 
@@ -26,11 +27,12 @@ mydb = myclient["meteor"]["captions"]
 # u = manager.list()
 # meeting = manager.dict()
 
+last_subtitle = ""
+# print(mydb)
 
-print(mydb)
-
-
-def the_loop():
+def the_loop(debug):
+    last_debug_line = ""
+    last_subtitle = ""
     meetings = {}
     while True:
         fullmessage = pubsub.get_message()
@@ -48,18 +50,27 @@ def the_loop():
                     logger.debug(meetings)
                     pubsub.subscribe(ASR)
             if "handle" in message.keys():
-                if message["handle"] == "completeUtterance":
+                if message["handle"] == "partialUtterance":
                     # print(fullmessage)
                     # print(message)
                     channel = fullmessage["channel"].decode("utf-8")
                     meetingId = channel.split("%")[0]
                     speaker = message["speaker"]
-                    print(speaker)
+                    # print(speaker)
                     utterance = message["utterance"]
                     id = get_meeting_pad(meetingId)
-                    print(id)
-                    send_utterance(id, utterance, speaker)
+                    # print(id)
+                    send_utterance(id, utterance, speaker) 
+                if debug and (message["handle"] == "completeUtterance"):
+                    if last_debug_line != utterance:
+                        write_debug(debug, utterance)
+                        last_debug_line = utterance
 
+
+
+def write_debug(debug, utterance):
+    with open(debug, "a+") as file:
+        file.write(utterance + "\n")
 
 def dict_handler(d, meetingId, ASR, participant):
     if ASR not in d.keys():
@@ -73,29 +84,42 @@ def dict_handler(d, meetingId, ASR, participant):
 def get_meeting_pad(meetingId):
     myquery = {"$and": [{"meetingId": meetingId}, {"locale.locale": "en"}]}
     v = mydb.find_one(myquery)
-    print(v)
+    # print(v)
     return v["_id"]
     # for i in mydb.find(myquery):
     #     print(i)
 
 
 def send_utterance(Id, utterance, speaker):
-    myquery = {"$and": [{"_id": Id}, {"locale.locale": "en"}]}
-    v = mydb.find_one(myquery)
-    revs = v["revs"]
-    length = v["length"]
-    subtitle = speaker + ": " + utterance + "\n"
-    mydb.update({
-        '_id': Id
-    }, {
-        '$set': {
-            'data': subtitle,
-            'revs': revs + 1,
-            'length': length + 1
-        }
-    }, upsert=False
-    )
+    global last_subtitle
+    if (len(utterance) == 0) or (utterance == "<UNK>"):
+        pass
+    elif last_subtitle != utterance:
+        print(utterance)
+        myquery = {"$and": [{"_id": Id}, {"locale.locale": "en"}]}
+        v = mydb.find_one(myquery)
+        revs = v["revs"]
+        length = v["length"]
+        subtitle = speaker + ": " + utterance + "\n"
+        mydb.update({
+            '_id': Id
+        }, {
+            '$set': {
+                'data': subtitle,
+                'revs': revs + 1,
+                'length': length + 1
+            }
+        }, upsert=False
+        )
+        last_subtitle = utterance
 
 
 if __name__ == "__main__":
-    the_loop()
+    # Argument parser
+    parser = argparse.ArgumentParser()
+
+    # flag (- and --) arguments
+    parser.add_argument("-d", "--debug", help="Filename for debug output")
+    args = parser.parse_args()
+    debug = args.debug
+    the_loop(debug)
