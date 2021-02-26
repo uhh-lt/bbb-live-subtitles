@@ -6,9 +6,11 @@ import time
 import argparse
 
 
-def start_kaldi(input, output, controlChannel, speaker):
-    os.chdir("/home/bbb/ba/kaldi_modelserver_bbb")
-    os.system("pykaldi_bbb_env/bin/python3.7 nnet3_model.py -m 0 -e -t -y models/kaldi_tuda_de_nnet3_chain2.yaml --redis-audio=%s --redis-channel=%s --redis-control=%s -s='%s' -fpc 190" % (input, output, controlChannel, speaker))
+def start_kaldi(server, input, output, controlChannel, speaker):
+    chDir = "/home/bbb/ba/kaldi_modelserver_bbb"
+    kaldiDir = "pykaldi_bbb_env/bin/python3.7 nnet3_model.py -m 0 -e -t -y models/kaldi_tuda_de_nnet3_chain2.yaml --redis-server=%s --redis-audio=%s --redis-channel=%s --redis-control=%s -s='%s' -fpc 190" % (server, input, output, controlChannel, speaker)
+    os.chdir(chDir)
+    os.system(kaldiDir)
 
 
 def wait_for_channel(server, port, channel):
@@ -33,7 +35,7 @@ def wait_for_channel(server, port, channel):
                 origCallerIDName = message["Caller-Orig-Caller-ID-Name"]
                 if message["Event"] == "LOADER_START":
                     print("Start Kaldi")
-                    p = mp.Process(target=start_kaldi, args=(inputChannel, outputChannel, controlChannel, callerUsername))
+                    p = mp.Process(target=start_kaldi, args=(server, inputChannel, outputChannel, controlChannel, callerUsername))
                     p.start()
                     kaldiInstances[inputChannel] = p
 

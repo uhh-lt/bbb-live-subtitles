@@ -65,6 +65,11 @@ def handle_loader():
                                         }
                             red.publish(data_channel[0], json.dumps(loaderStopMsg))
                             os.remove(mediaBugTarget)
+                            # KMS needs two more data chunks to end definitely
+                            time.sleep(0.5)
+                            red.publish(redisChannel, 8*"\x00")
+                            time.sleep(0.5)
+                            red.publish(redisChannel, 8*"\x00")
 
                 if "envelope" in message.keys():
                     if message["envelope"]["name"] == "VoiceCallStateEvtMsg":
