@@ -1,11 +1,11 @@
 import pymongo
-import time
+# import time
 import redis
 import json
 import logging
 import argparse
 
-from multiprocessing import Manager
+# from multiprocessing import Manager
 
 myclient = pymongo.MongoClient("mongodb://127.0.1.1:27017")
 
@@ -30,9 +30,9 @@ mydb = myclient["meteor"]["captions"]
 last_subtitle = ""
 # print(mydb)
 
+
 def the_loop(debug):
     last_debug_line = ""
-    last_subtitle = ""
     meetings = {}
     while True:
         fullmessage = pubsub.get_message()
@@ -60,17 +60,17 @@ def the_loop(debug):
                     utterance = message["utterance"]
                     id = get_meeting_pad(meetingId)
                     # print(id)
-                    send_utterance(id, utterance, speaker) 
+                    send_utterance(id, utterance, speaker)
                 if debug and (message["handle"] == "completeUtterance"):
                     if last_debug_line != utterance:
                         write_debug(debug, utterance)
                         last_debug_line = utterance
 
 
-
 def write_debug(debug, utterance):
     with open(debug, "a+") as file:
         file.write(utterance + "\n")
+
 
 def dict_handler(d, meetingId, ASR, participant):
     if ASR not in d.keys():

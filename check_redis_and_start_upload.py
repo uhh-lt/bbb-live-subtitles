@@ -97,7 +97,7 @@ def send_file_to_redis(filename, channel, chunksize=2048*2):
         else:
             time.sleep(0.1281)
             file.seek(last_read_pos)
-            
+
 #        where = file.tell()
 #        line = file.read()
 #        if not line:
