@@ -5,20 +5,49 @@ This project is a plugin for automatic subtitling in Big Blue Button (BBB), an o
 Currently, each BBB participant is subtitled individually. We use Kaldi/pyKaldi for automatic speech recognition (ASR). Any nnet3 compatible Kaldi model can be used. We offer free and ready to use models for [German ASR](https://github.com/uhh-lt/kaldi-tuda-de/) and we are working on making an English model available as well.
 
 # Installation and prerequisites:
-Requirements:
-Works with BigBlueButton 2.2.x, Ubuntu 16.04 and Python 3.7 and [kaldi-model-server](https://github.com/uhh-lt/kaldi-model-server)
+Tested with BigBlueButton 2.2.x, Ubuntu 16.04 and Python 3.6 and [kaldi-model-server](https://github.com/uhh-lt/kaldi-model-server)
+
+## Install and configure BBB-live-subtitles
+```Shell
+# Make sure you have Python 3.6 installed, its dev package and other dependencies: (Python3.7 could work also. There is a pykaldi wheel for 3.7 also)
+sudo apt-get install python3.6 python3.6-dev portaudio19-dev
+
+# Now clone the bbb-live-subtitles package somwhere:
+mkdir ~/projects
+cd ~/projects
+git clone https://github.com/uhh-lt/bbb-live-subtitles
+cd bbb-live-subtitles/
+
+# create the virtual environment and install the dependencies
+virtualenv -p /usr/bin/python3.6 bbbsub_env
+source bbbsub_env
+pip install redis pymongo jaspion pyyaml pyaudio samplerate scipy
+
+# Clone Kaldi-Model-Server
+git clone https://github.com/uhh-lt/kaldi-model-server.git
+
+# Install PyKaldi
+# Download the pykaldi wheel and install it
+wget http://ltdata1.informatik.uni-hamburg.de/pykaldi/pykaldi-0.1.2-cp36-cp36m-linux_x86_64.whl
+pip install pykaldi-0.1.2-cp36-cp36m-linux_x86_64.whl
+
+# Install Kaldi and Intel MKL (see note below if you have a different CPU than Intel)
+./install_mkl.sh
+./install_kaldi_intel.sh ~/projects/bbb-live-subtitles/bbbsub_env/bin/python3.6
+
+# OR if you have a non-Intel CPU:
+./install_kaldi.sh ~/projects/bbb-live-subtitles/bbbsub_env/bin/python3.6
+
+# Download the german Model for kaldi
+./download_example_models.sh
+```
 
 When working with different machines (see Section "usage") the configuration of the redis server must be changed to allow remote access, as outlined below.
 
-## Install Redis and configure it to Accept Remote Connections
-
-On most debian/ubuntu systems you can install redis with:
-
-```Shell
-sudo apt install redis-server
-```
-
+## Configure Redis to Accept Remote Connections
 If you like to host the speech recognition on another server in your local network, you need to allow connections to redis in your local network.
+When all scripts run on the same machine you can skip this step
+
 To do that change the configuration file
 ```Shell
 sudo nano /etc/redis/redis.conf
@@ -43,7 +72,7 @@ sudo nano /opt/freeswitch/etc/freeswitch/dialplan/default/bbb_echo_to_conference
 Add the following lines above the line `jitterbuffer`:
 ```XML
       <action application="set" data="RECORD_READ_ONLY=true"/>
-      <action application="set" data="record_sample_rate=8000"/> <!-- The samplerate is doubled by FS, it will write out 16kHz. Maybe writes out the Nyquist rate (2x) as output or its  a bug -->
+      <action application="set" data="record_sample_rate=8000"/> <!-- The samplerate is doubled by FS, it will write out 16kHz. Maybe writes out the Nyquist rate (2x) as output or its a bug -->
       <action application="record_session" data="/var/freeswitch/meetings/${strftime(%Y-%m-%d-%H-%M-%S)}_${call_uuid}.wav"/>
 ```
 Save the file and restart FreeSWITCH:
@@ -51,34 +80,20 @@ Save the file and restart FreeSWITCH:
 sudo service freeswitch restart
 ```
 
-## Clone and Install
-At first create a directory and clone the projects into it:
-```Shell
-mkdir ~/projects
-cd ~/projects
-git clone https://www.github.com/uhh-lt/bbb-live-subtitles
-```
-Create kaldi-model-server and follow the [instructions](https://github.com/uhh-lt/kaldi-model-server#installation)
-
-After these steps create a python virtual environment and start it
-```Shell
-cd ~/projects/bbb-live-subtitles
-virtualenv -p python3 bbb_env
-source bbb_env/bin/activate
-```
-Install the dependencies
-```Shell
-pip3 install redis jaspion pymongo
-```
-
 # Usage
 To use this project you can run every script on remote machines or if your machine is fast enough all services on the same machine.
-All the scripts need to run before the participant joins the conference. ASR processing is only loaded once it is needed, otherwise the script stand by and wait for participants to join conferences.
+All the scripts need to run before the participants join the conference. ASR processing is only loaded once it is needed, otherwise the script stand by and wait for participants to join conferences. After the participant leaves the conference or leaves the audio of the conference the ASR stops. When the participant joins back the audio with microphone the ASR starts.
 
-At first you need to start `esl_to_redis.py`. This module creates a connection to the FreeSWITCH Software through [ESL](https://freeswitch.org/confluence/display/FREESWITCH/Event+Socket+Library) and writes every information about the media bugs into the information redis channel.
+At first you need to start `esl_to_redis.py`. This module creates a connection to the FreeSWITCH Software through [ESL](https://freeswitch.org/confluence/display/FREESWITCH/Event+Socket+Library). It checks for new partitipants with audio and sends a message into the redis information channel.
 
-The next to start is `check_redis_and_start_upload.py`. This module checks the redis information channel for started bugs and starts the file upload onto the asr channel. When started on another machine the folder with the recordings must be shared. 
+The next to start is `check_redis_and_start_upload.py`. This module checks the redis information channel for started bugs and starts the file upload onto the redis asr channel. When started on another machine the folder with the recordings must be shared. 
 
-The `kaldi_starter.py` module is in this configuration on another machine (could also run on the same machine) and starts for each media bug a seperate Kaldi instance with the Kaldi-model-server. The kaldi-model-server then sends the transcrived speech back into a separate redis channel. 
+The `kaldi_starter.py` module is in this configuration on another machine (could also run on the same machine) and starts for each media bug a seperate pykaldi instance with the Kaldi-model-server. The kaldi-model-server sends the transcrived speech back into a separate redis channel.
+```Shell
+python3 kaldi_starter.py
+```
 
 With the `mongodbconnector.py` module the ASR Data is written into the mongodb database. To see subtitles, the presenter needs to start the subtitle functionanilty in BBB and then the participants can activate the subtitles by clicking on the CC button.
+
+# Problems / Questions / Suggestions?
+Feel free to write an issue, pull-request or write a mail :)
