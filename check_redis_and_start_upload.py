@@ -45,21 +45,24 @@ def handle_loader():
                         loaderStartMsg = {
                                           "Event": "LOADER_START",
                                           "Caller-Destination-Number": callerDestinationNumber,
-                                          "meetingId": meetingId, "Caller-Orig-Caller-ID-Name": origCallerIDName,
-                                          "Caller-Username": callerUsername, "ASR-Channel": redisChannel
+                                          "meetingId": meetingId,
+                                          "Caller-Orig-Caller-ID-Name": origCallerIDName,
+                                          "Caller-Username": callerUsername,
+                                          "ASR-Channel": redisChannel
                                           }
                         red.publish(data_channel[0], json.dumps(loaderStartMsg))
 
                     if message["Event"] == "MEDIA_BUG_STOP":
-                        logger.debug("Media Bug Stop")
-                        logger.info(message)
+                        logger.info("Media Bug Stop")
+                        logger.debug(message)
                         p = loader.pop(mediaBugTarget, None)
                         if p:
                             p.terminate()
                             loaderStopMsg = {
                                         "Event": "LOADER_STOP",
                                         "Caller-Destination-Number": callerDestinationNumber,
-                                        "meetingId": meetingId, "Caller-Orig-Caller-ID-Name": origCallerIDName,
+                                        "meetingId": meetingId,
+                                        "Caller-Orig-Caller-ID-Name": origCallerIDName,
                                         "Caller-Username": callerUsername,
                                         "ASR-Channel": redisChannel
                                         }
@@ -102,14 +105,6 @@ def send_file_to_redis(filename, channel, chunksize=2048*2):
         else:
             time.sleep(0.1281)
             file.seek(last_read_pos)
-
-#        where = file.tell()
-#        line = file.read()
-#        if not line:
-#            time.sleep(0.1)
-#            file.seek(where)
-#        else:
-#            red.publish(channel, line)
 
 
 if __name__ == "__main__":
