@@ -4,10 +4,11 @@ import redis
 import json
 import logging
 import argparse
+from urllib import parse
 
 server = "ltbbb2"
 ws_port = "3001"
-
+asr_channel = "asr_channel"
 
 # TODO: Add parameter to both
 app = Jaspion(host='127.0.0.1', port=8021, password='042f799c91402289')
@@ -17,6 +18,7 @@ logging.basicConfig()
 logger = logging.getLogger("ESL-Bridge")
 logger.setLevel(logging.DEBUG)
 
+
 @app.handle('conference::maintenance')
 @filtrate('Action', 'add-member')
 def add_member(event):
@@ -25,22 +27,24 @@ def add_member(event):
     uuid = event["Unique-ID"]
     Event = "add-member"
     callerDestinationNumber = event["Caller-Destination-Number"].replace("echo", "")
-    origCallerIDName = event["Caller-Orig-Caller-ID-Name"]
-    # origCallerID = origCallerIDName.partition("-bbbID-")[0]
-    callerUsername = origCallerIDName.partition("-bbbID-")[2]
-    print(callerUsername)
-    print(origCallerIDName)
-    # print(uuid)
-    
-    socket_adress = "ws://" + server + ":" + ws_port + "/" + callerDestinationNumber + "%%" + origCallerIDName.replace("-", "%35")
+    CallerOrigCallerIDName = event["Caller-Orig-Caller-ID-Name"]
+    CallerID = CallerOrigCallerIDName.partition("-bbbID-")[0]
+    callerUsername = CallerOrigCallerIDName.partition("-bbbID-")[2]
+    socket_adress = "ws://" + server + ":" + ws_port + "/" + \
+                    callerDestinationNumber + "/" + \
+                    parse.quote(CallerOrigCallerIDName)
     app.command(command="uuid_audio_fork " + uuid + " start " + socket_adress + " mono 16k", background=False)
-    
-    add_member = {  "Event": Event,
-                    "Caller-Destination-Number": callerDestinationNumber,
-                    "Caller-Orig-Caller-ID-Name": origCallerIDName,
-                    "Caller-Username": callerUsername,
-                }
+
+    add_member = {
+                  "Event": Event,
+                  "Caller-Destination-Number": callerDestinationNumber,
+                  "Caller-Orig-Caller-ID-Name": CallerOrigCallerIDName,
+                  "Caller-ID": CallerID,
+                  "Caller-Username": callerUsername,
+                  "UUID": uuid
+                 }
     send_to_pubsub(add_member)
+
 
 @app.handle('mod_audio_fork::connect')
 def mod_audio_fork_connect(event):
@@ -52,14 +56,16 @@ def mod_audio_fork_connect(event):
     origCallerIDName = event["Caller-Orig-Caller-ID-Name"]
     callerUsername = origCallerIDName.partition("-bbbID-")[2]
 
-    maf_connect = { "Event": Event,
+    maf_connect = {
+                    "Event": Event,
                     "Caller-Destination-Number": callerDestinationNumber,
                     "Caller-Orig-Caller-ID-Name": origCallerIDName,
                     "Caller-Username": callerUsername,
-                 }
+                  }
     send_to_pubsub(maf_connect)
 
-@app.handle('conference::maintenance')
+
+@app.handle('conference::maintenance')  # TODO
 @filtrate('Action', 'del-member')
 def del_member(event):
     print(event)
@@ -109,9 +115,11 @@ def del_member(event):
 
 
 def send_to_pubsub(data):
+    logger.debug("Redis Message to " + asr_channel + " :")
     logger.debug(data)
     data = json.dumps(data)
-    red.publish("asr_channel", data)
+    red.publish(asr_channel, data)
+
 
 if __name__ == '__main__':
     # Argument Parser
