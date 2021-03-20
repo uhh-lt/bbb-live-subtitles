@@ -4,6 +4,14 @@ import json
 import multiprocessing as mp
 import time
 import argparse
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+logger = logging.getLogger(__name__)
 
 
 def start_kaldi(server, input, output, controlChannel, speaker):
@@ -15,14 +23,14 @@ def start_kaldi(server, input, output, controlChannel, speaker):
 
 def wait_for_channel(server, port, channel):
     red = redis.Redis(host=server, port=port, password="")
-    pubsub = red.pubsub()
+    pubsub = red.pubsub(ignore_subscribe_messages=True)
     pubsub.subscribe(channel)
 
     while True:
         time.sleep(0.2)
         message = pubsub.get_message()
-        if message and message["data"] != 1:
-            try:
+        try:
+            if message:
                 message = json.loads(message["data"].decode("UTF-8"))
                 print(message)
                 callerUsername = message["Caller-Username"]
@@ -40,12 +48,24 @@ def wait_for_channel(server, port, channel):
                     
                 if message["Event"] == "LOADER_STOP":
                     audioChannel = message["Audio-Channel"]
-                    print("Stop Kaldi")
-                    red.publish(controlChannel, "shutdown")
+                    controlChannel = message["Control-Channel"]
+                    
+                    kaldi_shutdown(red, audioChannel, controlChannel)
                     redis_channel_message(red, channel, "KALDI_STOP", callerDestinationNumber, origCallerIDName, callerUsername, audioChannel, textChannel, controlChannel)
-            except:
-                pass
+                
+        except Exception as e:
+            print(e)
+            pass
 
+
+def kaldi_shutdown(red, audioChannel, controlChannel):
+    print(controlChannel)
+    logger.info("Stop Kaldi")
+    red.publish(controlChannel, "shutdown")
+    time.sleep(0.5)
+    red.publish(audioChannel, 8*"\x00")
+    time.sleep(0.5)
+    red.publish(audioChannel, 8*"\x00")
 
 def redis_channel_message(red, channel, Event, callerDestinationNumber, origCallerIDName, callerUsername, inputChannel, outputChannel, controlChannel):
     message = {
