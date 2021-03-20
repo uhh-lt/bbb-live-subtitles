@@ -4,6 +4,7 @@ import redis
 import json
 import logging
 import argparse
+from urllib import parse
 
 # from multiprocessing import Manager
 
@@ -34,9 +35,7 @@ def the_loop():
     while True:
         fullmessage = pubsub.get_message()
         if fullmessage:
-            print(fullmessage)
             message = json.loads(fullmessage["data"].decode("UTF-8"))
-            print(message)
             if "core" in message.keys():
                 if message["core"]["header"]["name"] == "VoiceCallStateEvtMsg" and message["core"]["body"]["callState"] == "IN_CONFERENCE":
                     meetingId = message["core"]["header"]["meetingId"]
@@ -52,11 +51,11 @@ def the_loop():
                     voiceConf = message["Caller-Destination-Number"]
                     callerName = message["Caller-Username"]
                     meetings = dict_handler(meetings, userId, callerName, voiceConf, TextChannel)
-                    # pubsub.subscribe(TextChannel)
+                    pubsub.subscribe(TextChannel)
             if "handle" in message.keys():
                 if message["handle"] == "partialUtterance":
-                    channel = fullmessage["channel"].decode("utf-8")
-                    voiceConf = channel.split("%%")[0]
+                    channel = parse.unquote(fullmessage["channel"].decode("utf-8"))
+                    voiceConf = channel.split("~")[0]
                     speaker = message["speaker"]
                     utterance = message["utterance"]
                     send_utterance(meetings, voiceConf, utterance, speaker)
@@ -104,7 +103,7 @@ def send_utterance(meetings: dict, voiceConf, utterance, speaker):
     if (len(utterance) == 0):
         pass
     elif last_subtitle != utterance:
-        print(utterance)
+        logger.debug(utterance)
         myquery = {"$and": [{"_id": pad}, {"locale.locale": "en"}]}
         v = mydb.find_one(myquery)
         revs = v["revs"]

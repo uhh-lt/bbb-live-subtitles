@@ -25,9 +25,9 @@ async def socket_to_redis(websocket, path):
     callerDestinationNumber = path.split("/")[0]
     origCallerIDName = path.split("/")[1]
     callerUsername = origCallerIDName.split("-bbbID-")[1]
-    audioChannel = parse.quote(origCallerIDName) + "~audio"
-    controlChannel = parse.quote(origCallerIDName) + "~control"
-    textChannel = parse.quote(origCallerIDName) + "~text"
+    audioChannel = parse.quote(callerDestinationNumber + "~" + origCallerIDName) + "~audio"
+    controlChannel = parse.quote(callerDestinationNumber + "~" + origCallerIDName) + "~control"
+    textChannel = parse.quote(callerDestinationNumber + "~" + origCallerIDName) + "~text"
     redis_message("LOADER_START", callerDestinationNumber, origCallerIDName, callerUsername, audioChannel, controlChannel, textChannel)
 
     async for message in websocket:
