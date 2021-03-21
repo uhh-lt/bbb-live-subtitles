@@ -44,7 +44,7 @@ def the_loop():
                     callerName = message["core"]["body"]["callerName"]
                     meetings = dict_handler(meetings, userId, callerName, voiceConf, meetingId)
             if "Event" in message.keys():
-                if message["Event"] == "KALDI_START":
+                if message["Event"] == "KALDI_START": # TODO: Message to Redis
                     logger.info("Kaldi is started. Lets get ASR!")
                     TextChannel = message["Text-Channel"]
                     userId = message["Caller-Orig-Caller-ID-Name"].split("-bbbID")[0]
@@ -52,6 +52,10 @@ def the_loop():
                     callerName = message["Caller-Username"]
                     meetings = dict_handler(meetings, userId, callerName, voiceConf, TextChannel)
                     pubsub.subscribe(TextChannel)
+                if message["Event"] == "KALDI_STOP": # TODO: Message to Redis
+                    logger.info("Kaldi is stopped. Unsubscribe channel")
+                    TextChannel = message["Text-Channel"]
+                    pubsub.unsubscribe(TextChannel)
             if "handle" in message.keys():
                 if message["handle"] == "partialUtterance":
                     channel = parse.unquote(fullmessage["channel"].decode("utf-8"))
