@@ -36,26 +36,16 @@ def the_loop():
         fullmessage = pubsub.get_message()
         if fullmessage:
             message = json.loads(fullmessage["data"].decode("UTF-8"))
-            if "core" in message.keys():
-                if message["core"]["header"]["name"] == "VoiceCallStateEvtMsg" and message["core"]["body"]["callState"] == "IN_CONFERENCE":
-                    meetingId = message["core"]["header"]["meetingId"]
-                    voiceConf = message["core"]["body"]["voiceConf"]
-                    userId = message["core"]["body"]["userId"]
-                    callerName = message["core"]["body"]["callerName"]
-                    meetings = dict_handler(meetings, userId, callerName, voiceConf, meetingId)
-            if "Event" in message.keys():
-                if message["Event"] == "KALDI_START": # TODO: Message to Redis
-                    logger.info("Kaldi is started. Lets get ASR!")
-                    TextChannel = message["Text-Channel"]
-                    userId = message["Caller-Orig-Caller-ID-Name"].split("-bbbID")[0]
-                    voiceConf = message["Caller-Destination-Number"]
-                    callerName = message["Caller-Username"]
-                    meetings = dict_handler(meetings, userId, callerName, voiceConf, TextChannel)
-                    pubsub.subscribe(TextChannel)
-                if message["Event"] == "KALDI_STOP": # TODO: Message to Redis
-                    logger.info("Kaldi is stopped. Unsubscribe channel")
-                    TextChannel = message["Text-Channel"]
-                    pubsub.unsubscribe(TextChannel)
+            event, textChannel, userId, voiceConf, meetingId, callerName = read_message(fullmessage)
+            if event == "VoiceCallStateEvtMsg~IN_CONFERENCE":
+                meetings = dict_handler(meetings, userId, callerName, voiceConf, meetingId)     
+            if event == "KALDI_START": # TODO: Message to Redis
+                logger.info("Kaldi is started. Lets get ASR!")
+                meetings = dict_handler(meetings, userId, callerName, voiceConf, TextChannel=textChannel)
+                pubsub.subscribe(textChannel)
+            if event == "KALDI_STOP": # TODO: Message to Redis
+                logger.info("Kaldi is stopped. Unsubscribe channel")
+                pubsub.unsubscribe(textChannel)
             if "handle" in message.keys():
                 if message["handle"] == "partialUtterance":
                     channel = parse.unquote(fullmessage["channel"].decode("utf-8"))
@@ -63,6 +53,28 @@ def the_loop():
                     speaker = message["speaker"]
                     utterance = message["utterance"]
                     send_utterance(meetings, voiceConf, utterance, speaker)
+
+
+def read_message(fullmessage):
+    event = textChannel = userId = voiceConf = meetingId = callerName = None
+    message = json.loads(fullmessage["data"].decode("UTF-8"))
+    logger.debug(message)
+    if "Event" in message.keys(): # Live-Subtitles messages
+        event = message["Event"]
+        if "Text-Channel" in message.keys():
+            textChannel = message["Text-Channel"]
+        userId = message["Caller-Orig-Caller-ID-Name"].split("-bbbID")[0]
+        voiceConf = message["Caller-Destination-Number"]
+        callerName = message["Caller-Username"]
+    if "core" in message.keys() and "header" in message["core"].keys() and "body" in message["core"].keys(): # BBB messages
+        message = message["core"]
+        if "name" in message["header"].keys() and "body" in message.keys() and "callState" in message["body"].keys():
+            event = message["header"]["name"] + "~" + message["body"]["callState"]
+            userId = message["body"]["userId"]
+            voiceConf = message["body"]["voiceConf"]
+            meetingId = message["header"]["meetingId"]
+            callerName = message["body"]["callerName"]
+    return event, textChannel, userId, voiceConf, meetingId, callerName
 
 
 def dict_handler(d: dict, userId, callerName, voiceConf, meetingId=None, TextChannel=None, pad=None):
@@ -96,6 +108,7 @@ def get_meeting_pad(meetingId):
 def send_utterance(meetings: dict, voiceConf, utterance, speaker):
     global last_subtitle
     meetingId = meetings[voiceConf]["meetingId"]
+    print(meetingId)
     # print(meetings[voiceConf]["pad"])
     if "pad" not in meetings[voiceConf].keys():
         pad = get_meeting_pad(meetingId)
