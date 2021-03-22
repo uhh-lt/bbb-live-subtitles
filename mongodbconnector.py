@@ -6,8 +6,6 @@ import logging
 import argparse
 from urllib import parse
 
-# from multiprocessing import Manager
-
 myclient = pymongo.MongoClient("mongodb://127.0.1.1:27017")
 
 logging.basicConfig(
@@ -24,9 +22,6 @@ pubsub.subscribe("asr_channel", "from-akka-apps-redis-channel")
 
 mydb = myclient["meteor"]["captions"]
 
-# manager = Manager()
-# u = manager.list()
-# meeting = manager.dict()
 last_subtitle = ""
 
 
@@ -35,8 +30,7 @@ def the_loop():
     while True:
         fullmessage = pubsub.get_message()
         if fullmessage:
-            message = json.loads(fullmessage["data"].decode("UTF-8"))
-            event, textChannel, userId, voiceConf, meetingId, callerName = read_message(fullmessage)
+            event, textChannel, userId, voiceConf, meetingId, callerName, utterance = read_message(fullmessage)
             if event == "VoiceCallStateEvtMsg~IN_CONFERENCE":
                 meetings = dict_handler(meetings, userId, callerName, voiceConf, meetingId)     
             if event == "KALDI_START": # TODO: Message to Redis
@@ -46,20 +40,20 @@ def the_loop():
             if event == "KALDI_STOP": # TODO: Message to Redis
                 logger.info("Kaldi is stopped. Unsubscribe channel")
                 pubsub.unsubscribe(textChannel)
-            if "handle" in message.keys():
-                if message["handle"] == "partialUtterance":
-                    channel = parse.unquote(fullmessage["channel"].decode("utf-8"))
-                    voiceConf = channel.split("~")[0]
-                    speaker = message["speaker"]
-                    utterance = message["utterance"]
-                    send_utterance(meetings, voiceConf, utterance, speaker)
+            if event == "partialUtterance":
+                send_utterance(meetings, voiceConf, utterance, callerName)
 
 
 def read_message(fullmessage):
+    """
+    There are three main sources for messages: BBB-core, bbb-live-subtitles and kaldi-model-server.
+    
+    """
     event = textChannel = userId = voiceConf = meetingId = callerName = None
+    utterance = ""
     message = json.loads(fullmessage["data"].decode("UTF-8"))
     logger.debug(message)
-    if "Event" in message.keys(): # Live-Subtitles messages
+    if "Event" in message.keys():
         event = message["Event"]
         if "Text-Channel" in message.keys():
             textChannel = message["Text-Channel"]
@@ -74,7 +68,15 @@ def read_message(fullmessage):
             voiceConf = message["body"]["voiceConf"]
             meetingId = message["header"]["meetingId"]
             callerName = message["body"]["callerName"]
-    return event, textChannel, userId, voiceConf, meetingId, callerName
+    if "handle" in message.keys():
+        event = message["handle"]
+        voiceConf = parse.unquote(fullmessage["channel"].decode("utf-8")).split("~")[0]
+        if "speaker" in message.keys():
+            callerName = message["speaker"]
+        if event == "partialUtterance":
+            utterance = message["utterance"]
+
+    return event, textChannel, userId, voiceConf, meetingId, callerName, utterance
 
 
 def dict_handler(d: dict, userId, callerName, voiceConf, meetingId=None, TextChannel=None, pad=None):
@@ -107,6 +109,8 @@ def get_meeting_pad(meetingId):
 
 def send_utterance(meetings: dict, voiceConf, utterance, speaker):
     global last_subtitle
+    print("hi")
+    print(last_subtitle)
     meetingId = meetings[voiceConf]["meetingId"]
     print(meetingId)
     # print(meetings[voiceConf]["pad"])
