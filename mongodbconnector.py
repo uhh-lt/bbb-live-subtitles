@@ -1,15 +1,16 @@
 import pymongo
-# import time
+import time
 import redis
 import json
 import logging
 import argparse
 from urllib import parse
+from collections import OrderedDict
 
 myclient = pymongo.MongoClient("mongodb://127.0.1.1:27017")
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
@@ -41,39 +42,46 @@ def the_loop():
                 logger.info("Kaldi is stopped. Unsubscribe channel")
                 pubsub.unsubscribe(textChannel)
             if event == "partialUtterance":
-                send_utterance(meetings, voiceConf, utterance, callerName)
+                send_utterance(meetings, voiceConf, callerName, utterance)
+                meetings = store_subtitle(meetings, userId, voiceConf, callerName, utterance)
+                meetings = show_subtitle(meetings, voiceConf, callerName, utterance)
 
 
 def read_message(fullmessage):
     """
-    There are three main sources for messages: BBB-core, bbb-live-subtitles and kaldi-model-server.
-    
+    There are three main sources for messages: bbb-live-subtitles, BBB-core and kaldi-model-server.
+    bbb-live-subtitles are mostly informations about the call (Event, Caller-Destination-Number, Caller-Orig-Caller-ID-Name, Caller-Username, Audio-Channel, Text-Channel, Control-Channel)
+    BBB-core messages with an envelope and nested
+    kaldi-model-server
     """
     event = textChannel = userId = voiceConf = meetingId = callerName = None
     utterance = ""
     message = json.loads(fullmessage["data"].decode("UTF-8"))
-    logger.debug(message)
-    if "Event" in message.keys():
+    
+    if "Event" in message.keys(): # bbb-live-subtitle
+        logger.debug(message)
         event = message["Event"]
-        if "Text-Channel" in message.keys():
-            textChannel = message["Text-Channel"]
+        textChannel = message.get("Text-Channel") # .get() returns None if is key not present
         userId = message["Caller-Orig-Caller-ID-Name"].split("-bbbID")[0]
         voiceConf = message["Caller-Destination-Number"]
         callerName = message["Caller-Username"]
-    if "core" in message.keys() and "header" in message["core"].keys() and "body" in message["core"].keys(): # BBB messages
+    if "core" in message.keys() and "header" in message["core"].keys() and "body" in message["core"].keys(): # BBB-core
         message = message["core"]
         if "name" in message["header"].keys() and "body" in message.keys() and "callState" in message["body"].keys():
+            logger.info(message)
             event = message["header"]["name"] + "~" + message["body"]["callState"]
             userId = message["body"]["userId"]
             voiceConf = message["body"]["voiceConf"]
             meetingId = message["header"]["meetingId"]
             callerName = message["body"]["callerName"]
-    if "handle" in message.keys():
+    if "handle" in message.keys(): # kaldi-model-server
         event = message["handle"]
-        voiceConf = parse.unquote(fullmessage["channel"].decode("utf-8")).split("~")[0]
-        if "speaker" in message.keys():
-            callerName = message["speaker"]
+        fullmessage = parse.unquote(fullmessage["channel"].decode("utf-8"))
+        voiceConf = fullmessage.split("~")[0]
+        userId = fullmessage.split("~")[1].split("-bbbID-")[0]
+        callerName = message.get("speaker")
         if event == "partialUtterance":
+            logger.info(fullmessage)
             utterance = message["utterance"]
 
     return event, textChannel, userId, voiceConf, meetingId, callerName, utterance
@@ -83,6 +91,7 @@ def dict_handler(d: dict, userId, callerName, voiceConf, meetingId=None, TextCha
     if voiceConf not in d.keys():
         d[voiceConf] = {}
         d[voiceConf]["userId"] = {}
+        d[voiceConf]["subtitles"] = OrderedDict()
         if meetingId:
             d[voiceConf]["meetingId"] = meetingId
         if TextChannel:
@@ -107,18 +116,13 @@ def get_meeting_pad(meetingId):
     #     print(i)
 
 
-def send_utterance(meetings: dict, voiceConf, utterance, speaker):
+def send_utterance(meetings: dict, voiceConf, callerName, utterance):
     global last_subtitle
-    print("hi")
-    print(last_subtitle)
     meetingId = meetings[voiceConf]["meetingId"]
-    print(meetingId)
-    # print(meetings[voiceConf]["pad"])
     if "pad" not in meetings[voiceConf].keys():
         pad = get_meeting_pad(meetingId)
     else:
         pad = meetings[voiceConf]["pad"]
-
     utterance = utterance.replace("<UNK>", "").replace("wow", "").replace("ähm", "").replace("äh", "") # removes hesitations and <UNK> Token
     utterance = " ".join(utterance.split()) # removes multiples spaces
     if (len(utterance) == 0):
@@ -129,7 +133,7 @@ def send_utterance(meetings: dict, voiceConf, utterance, speaker):
         v = mydb.find_one(myquery)
         revs = v["revs"]
         length = v["length"]
-        subtitle = speaker + ": " + utterance + "\n"
+        subtitle = callerName + ": " + utterance + "\n"
         mydb.update({
             '_id': pad
         }, {
@@ -142,6 +146,69 @@ def send_utterance(meetings: dict, voiceConf, utterance, speaker):
         )
         last_subtitle = utterance
 
+def store_subtitle(meetings: dict, userId, voiceConf, callerName, utterance, priority = 0):
+    """
+    The subtitles are stored with metadata in the meetings dict.
+    The subtitles dict objects have the following parameters:
+    [userId, userName, subtitle, timeWritten, priority].
+    The timeWritten variable declares the last time the utterance was changed.
+    When the last change is more than x seconds ago the line is getting removed from the list.
+    The priority variable is for later usage to push the presenter to the top of the subtitles.
+    """
+    actualTime = time.time()
+    subtitles = meetings[voiceConf]["subtitles"]
+    utterance = utterance.replace("<UNK>", "").replace("wow", "").replace("ähm", "").replace("äh", "") # removes hesitations and <UNK> Token
+    utterance = " ".join(utterance.split()) # removes multiples spaces
+    
+    if len(utterance) > 1:
+        subtitles[userId] = {
+                              "callerName" : callerName,
+                              "subtitle" : utterance,
+                              "time" : actualTime,
+                              "priority" : priority
+                            }
+    
+    new_subtitles = OrderedDict()
+    for key, value in subtitles.items():
+        if actualTime - value["time"] < 4:
+            new_subtitles[key] = value
+    meetings[voiceConf]["subtitles"] = new_subtitles
+    return meetings
+
+
+def show_subtitle(meetings: dict, voiceConf, callerName, utterance):
+    meetingId = meetings[voiceConf]["meetingId"]
+    if "pad" not in meetings[voiceConf].keys():
+        pad = get_meeting_pad(meetingId)
+    else:
+        pad = meetings[voiceConf]["pad"]
+    
+    subtitles = meetings[voiceConf]["subtitles"]
+    
+    print(len(subtitles))
+    if len(subtitles) == 1 :
+        print(subtitles)
+    
+    return meetings
+    # if (len(utterance) == 0):
+    #     pass
+    # elif last_subtitle != utterance:
+    #     logger.debug(utterance)
+    #     myquery = {"$and": [{"_id": pad}, {"locale.locale": "en"}]}
+    #     v = mydb.find_one(myquery)
+    #     revs = v["revs"]
+    #     length = v["length"]
+    #     subtitle = callerName + ": " + utterance + "\n"
+    #     mydb.update({
+    #         '_id': pad
+    #     }, {
+    #         '$set': {
+    #             'data': subtitle,
+    #             'revs': revs + 1,
+    #             'length': length + 1
+    #         }
+    #     }, upsert=False
+    #     )
 
 if __name__ == "__main__":
     # Argument parser
