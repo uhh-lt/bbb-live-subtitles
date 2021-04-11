@@ -111,10 +111,13 @@ def dict_handler(d: dict, userId, callerName, voiceConf, meetingId=None, TextCha
 
 
 def get_meeting_pad(meetingId):
-    myquery = {"$and": [{"meetingId": meetingId}, {"locale.locale": "en"}]}
+    myquery = {"$and": [{"meetingId": meetingId}, {"locale.locale": "de"}]}
     v = mydb.find_one(myquery)
     # print(v)
-    return v["_id"]
+    if v is None:
+        return None
+    else:
+        return v["_id"]
     # for i in mydb.find(myquery):
     #     print(i)
 
@@ -132,7 +135,7 @@ def send_utterance(meetings: dict, voiceConf, callerName, utterance):
         pass
     elif last_subtitle != utterance:
         logger.debug(utterance)
-        myquery = {"$and": [{"_id": pad}, {"locale.locale": "en"}]}
+        myquery = {"$and": [{"_id": pad}, {"locale.locale": "de"}]}
         v = mydb.find_one(myquery)
         revs = v["revs"]
         length = v["length"]
@@ -178,14 +181,17 @@ def send_subtitle(meetings: dict, voiceConf):
         pad = get_meeting_pad(meetingId)
     else:
         pad = meetings[voiceConf]["pad"]
-
+    
+    if pad is None:  # bugfix when the conference ended but kaldi isn't fast enough
+        return
+    
     subtitles = meetings[voiceConf]["subtitles"]
 
     subtitle = subtitles.show()
     print(subtitle)
     if subtitle is not None:
         logger.debug(subtitle)
-        myquery = {"$and": [{"_id": pad}, {"locale.locale": "en"}]}
+        myquery = {"$and": [{"_id": pad}, {"locale.locale": "de"}]}
         v = mydb.find_one(myquery)
         revs = v["revs"]
         length = v["length"]
