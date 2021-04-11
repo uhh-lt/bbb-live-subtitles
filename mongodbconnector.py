@@ -155,6 +155,7 @@ def send_utterance(meetings: dict, voiceConf, callerName, utterance):
 
 def store_subtitle(meetings: dict, userId, voiceConf, callerName, utterance, priority=0):
     actualTime = time.time()
+    durationSubtitle = 1
     subtitles = meetings[voiceConf]["subtitles"]
     utterance = utterance.replace("<UNK>", "").replace("wow", "").replace("ähm", "").replace("äh", "")  # removes hesitations and <UNK> Token
     utterance = " ".join(utterance.split())  # removes multiples spaces
@@ -169,7 +170,7 @@ def store_subtitle(meetings: dict, userId, voiceConf, callerName, utterance, pri
 
     new_subtitles = OrderedDict()
     for key, value in subtitles.items():
-        if actualTime - value["time"] < 4:
+        if actualTime - value["time"] < durationSubtitle:
             new_subtitles[key] = value
     meetings[voiceConf]["subtitles"] = new_subtitles
     return meetings
@@ -181,10 +182,10 @@ def send_subtitle(meetings: dict, voiceConf):
         pad = get_meeting_pad(meetingId)
     else:
         pad = meetings[voiceConf]["pad"]
-    
+
     if pad is None:  # bugfix when the conference ended but kaldi isn't fast enough
         return
-    
+
     subtitles = meetings[voiceConf]["subtitles"]
 
     subtitle = subtitles.show()
@@ -208,10 +209,4 @@ def send_subtitle(meetings: dict, voiceConf):
 
 
 if __name__ == "__main__":
-    # Argument parser
-    parser = argparse.ArgumentParser()
-
-    # flag (- and --) arguments
-    parser.add_argument("-d", "--debug", help="Filename for debug output")
-    args = parser.parse_args()
     the_loop()
