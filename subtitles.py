@@ -14,12 +14,13 @@ class subtitles:
         maintenance.start()
 
     def __subtitleMaintenance__(self):
+        durationSubtitle = 0  
         while True:
             subtitles = self.subtitles
             actualTime = time.time()
             new_subtitles = OrderedDict()
             for key, value in subtitles.items():
-                if actualTime - value["time"] < 4:
+                if actualTime - value["time"] < durationSubtitle:
                     new_subtitles[key] = value
             self.subtitles = new_subtitles
             time.sleep(1)
@@ -52,16 +53,16 @@ class subtitles:
         subtitles = self.subtitles
         iterSubtitle = iter(subtitles)
         if len(subtitles) > 0:
-            if len(subtitles) == 1:
-                keySub = next(iterSubtitle)
-                sub = subtitles[keySub]
-                return self.__createFullSubtitle__(sub)
-            else:
-                keySub1 = next(iterSubtitle)
-                sub1 = subtitles[keySub1]
-                keySub2 = next(iterSubtitle)
-                sub2 = subtitles[keySub2]
-                return self.__createFullSubtitle__(sub1, sub2)
+            # if len(subtitles) == 1: # When both participants talk at the same time BBB doesnt replace the subtitle it adds another one below it.
+            keySub = next(iterSubtitle)
+            sub = subtitles[keySub]
+            return self.__createFullSubtitle__(sub)
+            # else:
+            #     keySub1 = next(iterSubtitle)
+            #     sub1 = subtitles[keySub1]
+            #     keySub2 = next(iterSubtitle)
+            #     sub2 = subtitles[keySub2]
+            #     return self.__createFullSubtitle__(sub1, sub2)
         else:
             return None
 
