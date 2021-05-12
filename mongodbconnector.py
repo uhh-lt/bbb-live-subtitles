@@ -1,11 +1,10 @@
 import pymongo
-import time
+# import time
 import redis
 import json
 import logging
-import argparse
+# import argparse
 from urllib import parse
-from collections import OrderedDict
 
 from subtitles import subtitles
 
@@ -44,8 +43,8 @@ def the_loop():
                 logger.info("Kaldi is stopped. Unsubscribe channel")
                 pubsub.unsubscribe(textChannel)
             if event == "partialUtterance" or event == "completeUtterance":
-                meetings[voiceConf]["subtitles"].insert(userId=userId, callerName=callerName, utterance=utterance)
-                print(meetings[voiceConf]["subtitles"].list())
+                meetings[voiceConf]["subtitles"].insert(userId=userId, callerName=callerName, utterance=utterance, event=event)
+                # print(meetings[voiceConf]["subtitles"].list())
                 # send_utterance(meetings, voiceConf, callerName, utterance)
                 send_subtitle(meetings, voiceConf)
 
@@ -83,7 +82,7 @@ def read_message(fullmessage):
         voiceConf = fullmessage.split("~")[0]
         userId = fullmessage.split("~")[1].split("-bbbID-")[0]
         callerName = message.get("speaker")
-        if event == "partialUtterance":
+        if event == "partialUtterance" or event == "completeUtterance":
             logger.info(fullmessage)
             utterance = message["utterance"]
 
@@ -122,58 +121,58 @@ def get_meeting_pad(meetingId):
     #     print(i)
 
 
-def send_utterance(meetings: dict, voiceConf, callerName, utterance):
-    global last_subtitle
-    meetingId = meetings[voiceConf]["meetingId"]
-    if "pad" not in meetings[voiceConf].keys():
-        pad = get_meeting_pad(meetingId)
-    else:
-        pad = meetings[voiceConf]["pad"]
-    utterance = utterance.replace("<UNK>", "").replace("wow", "").replace("ähm", "").replace("äh", "")  # removes hesitations and <UNK> Token
-    utterance = " ".join(utterance.split())  # removes multiples spaces
-    if (len(utterance) == 0):
-        pass
-    elif last_subtitle != utterance:
-        logger.debug(utterance)
-        myquery = {"$and": [{"_id": pad}, {"locale.locale": "de"}]}
-        v = mydb.find_one(myquery)
-        revs = v["revs"]
-        length = v["length"]
-        subtitle = callerName + ": " + utterance + "\n"
-        mydb.update({
-            '_id': pad
-        }, {
-            '$set': {
-                'data': subtitle,
-                'revs': revs + 1,
-                'length': length + 1
-            }
-        }, upsert=False
-        )
-        last_subtitle = utterance
+# def send_utterance(meetings: dict, voiceConf, callerName, utterance):
+#     global last_subtitle
+#     meetingId = meetings[voiceConf]["meetingId"]
+#     if "pad" not in meetings[voiceConf].keys():
+#         pad = get_meeting_pad(meetingId)
+#     else:
+#         pad = meetings[voiceConf]["pad"]
+#     utterance = utterance.replace("<UNK>", "").replace("wow", "").replace("ähm", "").replace("äh", "")  # removes hesitations and <UNK> Token
+#     utterance = " ".join(utterance.split())  # removes multiples spaces
+#     if (len(utterance) == 0):
+#         pass
+#     elif last_subtitle != utterance:
+#         logger.debug(utterance)
+#         myquery = {"$and": [{"_id": pad}, {"locale.locale": "de"}]}
+#         v = mydb.find_one(myquery)
+#         revs = v["revs"]
+#         length = v["length"]
+#         subtitle = callerName + ": " + utterance + "\n"
+#         mydb.update({
+#             '_id': pad
+#         }, {
+#             '$set': {
+#                 'data': subtitle,
+#                 'revs': revs + 1,
+#                 'length': length + 1
+#             }
+#         }, upsert=False
+#         )
+#         last_subtitle = utterance
 
 
-def store_subtitle(meetings: dict, userId, voiceConf, callerName, utterance, priority=0):
-    actualTime = time.time()
-    durationSubtitle = 1
-    subtitles = meetings[voiceConf]["subtitles"]
-    utterance = utterance.replace("<UNK>", "").replace("wow", "").replace("ähm", "").replace("äh", "")  # removes hesitations and <UNK> Token
-    utterance = " ".join(utterance.split())  # removes multiples spaces
+# def store_subtitle(meetings: dict, userId, voiceConf, callerName, utterance, priority=0):
+#     actualTime = time.time()
+#     durationSubtitle = 1
+#     subtitles = meetings[voiceConf]["subtitles"]
+#     utterance = utterance.replace("<UNK>", "").replace("wow", "").replace("ähm", "").replace("äh", "")  # removes hesitations and <UNK> Token
+#     utterance = " ".join(utterance.split())  # removes multiples spaces
 
-    if len(utterance) > 1:
-        subtitles[userId] = {
-                              "callerName": callerName,
-                              "subtitle": utterance,
-                              "time": actualTime,
-                              "priority": priority
-                            }
+#     if len(utterance) > 1:
+#         subtitles[userId] = {
+#                               "callerName": callerName,
+#                               "subtitle": utterance,
+#                               "time": actualTime,
+#                               "priority": priority
+#                             }
 
-    new_subtitles = OrderedDict()
-    for key, value in subtitles.items():
-        if actualTime - value["time"] < durationSubtitle:
-            new_subtitles[key] = value
-    meetings[voiceConf]["subtitles"] = new_subtitles
-    return meetings
+#     new_subtitles = OrderedDict()
+#     for key, value in subtitles.items():
+#         if actualTime - value["time"] < durationSubtitle:
+#             new_subtitles[key] = value
+#     meetings[voiceConf]["subtitles"] = new_subtitles
+#     return meetings
 
 
 def send_subtitle(meetings: dict, voiceConf):
