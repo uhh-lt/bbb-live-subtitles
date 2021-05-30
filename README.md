@@ -67,6 +67,12 @@ redis-cli -h 192.168.0.1 -p 6379
 ```
 Note that you shouldn't let Redis listen on a public IP, as you would otherwise expose raw speech data packages and other data to the public. If in doubt consult your admin about network and firewall settings and make sure that Redis can only be accessed from trusted hosts.
 
+When using iptables as your firewall you can add a rule like this:
+```Shell
+iptables -A INPUT -p tcp --destination-port 6379 -m iprange --src-range 192.168.0.1-192.168.0.254 -j ACCEPT
+```
+This example opens the Port 6379 for TCP connections to a range of IP adresses between 192.168.0.1 and 192.168.0.254.
+
 ## Install libwebsockets and mod_audio_fork
 To fork the audio we use the [mod_audio_fork](https://github.com/drachtio/drachtio-freeswitch-modules/tree/master/modules/mod_audio_fork) Plugin. This plugin needs libwebsockets to be installed.
 We compiled already a compatible version so you only need to run the script with `sudo` to download and install it:
