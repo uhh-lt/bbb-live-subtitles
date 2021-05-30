@@ -1,18 +1,15 @@
 # bbb-live-subtitles
-This project is a plugin for automatic subtitling in BigBlueButton (BBB), an open source web conferencing system. bbb-live-subtitles will run real time automatic speech recognition (ASR) and will generate subtitle captions on-the-fly. No cloud services are used for ASR, instead we use our own speech recognition models that can be run locally. This ensures that no privacy issues arise. There are a german and english modell already build and ready to use (english runs only with pykaldi 0.2.0 and Python 3.8)
+This project is a plugin for automatic subtitling in BigBlueButton (BBB), an open source web conferencing system. bbb-live-subtitles will run real time automatic speech recognition (ASR) and will generate subtitle captions on-the-fly. No cloud services are used for ASR, instead we use our own speech recognition models that can be run locally. This ensures that no privacy issues arise. There are a german and english model already build and ready to use (english runs only with pykaldi > 0.2.0 and Python 3.8)
 
 # Subtitling of BBB Participants
-Currently, each BBB participant is subtitled individually. We use Kaldi/pyKaldi for automatic speech recognition (ASR). Any nnet3 compatible Kaldi model can be used. We offer free and ready to use models for [German ASR](https://github.com/uhh-lt/kaldi-tuda-de/) and we are working on making an English model available as well.
+Currently, each BBB participant is subtitled individually. We use Kaldi/pyKaldi for automatic speech recognition (ASR). Any nnet3 compatible Kaldi model can be used. We offer free and ready to use models for [German ASR](https://github.com/uhh-lt/kaldi-tuda-de/) and an English model is available as well.
 
 # Installation and prerequisites:
-Tested with BigBlueButton 2.2.x, Ubuntu 16.04, Python 3.6 and [kaldi-model-server](https://github.com/uhh-lt/kaldi-model-server)
+Tested with BigBlueButton 2.2.x, Ubuntu 20.04, Python 3.8 and [kaldi-model-server](https://github.com/uhh-lt/kaldi-model-server)
 
 ## Install and configure BBB-live-subtitles
 ```Shell
-# Make sure you have Python 3.6 installed, its dev package and other dependencies: (Python3.7 could work also. There is a PyKaldi wheel for 3.7 also)
-sudo apt-get install python3.6 python3.6-dev portaudio19-dev
-
-# When using pykaldi 0.2.0 and the english model make sure Python 3.8 is installed:
+# Make sure you have Python 3.8 installed, its dev package and other dependencies: (Python 3.7 could work also. There is a PyKaldi wheel for 3.7 also)
 sudo apt-get install python3.8 python3.8-dev portaudio19-dev
 
 # Now clone the bbb-live-subtitles package somewhere:
@@ -22,7 +19,7 @@ git clone https://github.com/uhh-lt/bbb-live-subtitles
 cd bbb-live-subtitles/
 
 # create the virtual environment and install the dependencies
-virtualenv -p /usr/bin/python3.6 bbbsub_env # or python3.8 for pykaldi 0.2.0
+virtualenv -p /usr/bin/python3.8 bbbsub_env
 source bbbsub_env
 pip install redis pymongo jaspion pyyaml pyaudio samplerate scipy
 
@@ -32,26 +29,20 @@ git clone https://github.com/uhh-lt/kaldi-model-server.git
 # Install PyKaldi
 # Download the PyKaldi wheel and install it
 
-# PyKaldi 0.1.0:
-wget http://ltdata1.informatik.uni-hamburg.de/pykaldi/pykaldi-0.1.2-cp36-cp36m-linux_x86_64.whl
-pip install pykaldi-0.1.2-cp36-cp36m-linux_x86_64.whl
-
 # PyKaldi 0.2.0:
 wget http://ltdata1.informatik.uni-hamburg.de/pykaldi/pykaldi-0.2.0-cp38-cp38-linux_x86_64.whl
 pip install pykaldi-0.2.0-cp38-cp38-linux_x86_64.whl
 
 # Install Kaldi and Intel MKL (see note below if you have a different CPU than Intel)
 ./install_mkl.sh
-./install_kaldi_intel.sh ~/projects/bbb-live-subtitles/bbbsub_env/bin/python3.6 # or python 3.8
+./install_kaldi_intel.sh ~/projects/bbb-live-subtitles/bbbsub_env/bin/python3.8
 
 # OR if you have a non-Intel CPU:
-./install_kaldi.sh ~/projects/bbb-live-subtitles/bbbsub_env/bin/python3.6 # or python 3.8
+./install_kaldi.sh ~/projects/bbb-live-subtitles/bbbsub_env/bin/python3.8
 
-# Download the german Model
+# Download the english and german Model
 ./download_example_models.sh
 
-# Download the english Model and uncompress it in models/
-wget http://ltdata1.informatik.uni-hamburg.de/pykaldi/en_160k_nnet3chain_tdnn1f_2048_sp_bi.tar.bz2
 ```
 
 
