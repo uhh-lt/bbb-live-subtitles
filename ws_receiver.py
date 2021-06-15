@@ -25,23 +25,29 @@ async def socket_to_redis(websocket, path):
     callerDestinationNumber = path.split("/")[0]
     origCallerIDName = path.split("/")[1]
     callerUsername = origCallerIDName.split("-bbbID-")[1]
+    language = origCallerIDName.split("-bbbID-")[1].rsplit("_", 1)[1]
+    if language == "E":
+        language = "English"
+    else:
+        language = "German"
     audioChannel = parse.quote(callerDestinationNumber + "~" + origCallerIDName) + "~audio"
     controlChannel = parse.quote(callerDestinationNumber + "~" + origCallerIDName) + "~control"
     textChannel = parse.quote(callerDestinationNumber + "~" + origCallerIDName) + "~text"
-    redis_message("LOADER_START", callerDestinationNumber, origCallerIDName, callerUsername, audioChannel, controlChannel, textChannel)
+    redis_message("LOADER_START", callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, controlChannel, textChannel)
 
     async for message in websocket:
         red.publish(audioChannel, message)
     logger.info("Connection %s closed" % path)
-    redis_message("LOADER_STOP", callerDestinationNumber, origCallerIDName, callerUsername, audioChannel, controlChannel, textChannel)
+    redis_message("LOADER_STOP", callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, controlChannel, textChannel)
 
 
-def redis_message(event, callerDestinationNumber, origCallerIDName, callerUsername, audioChannel, controlChannel, textChannel):
+def redis_message(event, callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, controlChannel, textChannel):
     message = {
                 "Event": event,
                 "Caller-Destination-Number": callerDestinationNumber,
                 "Caller-Orig-Caller-ID-Name": origCallerIDName,
                 "Caller-Username": callerUsername,
+                "Language" : language,
                 "Audio-Channel": audioChannel,
                 "Control-Channel": controlChannel,
                 "Text-Channel": textChannel,
