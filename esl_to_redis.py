@@ -27,8 +27,7 @@ def add_member(event):
     uuid = event["Unique-ID"]
     Event = "add-member"
     callerDestinationNumber = event["Caller-Destination-Number"].replace("echo", "")
-    callerOrigCallerIdName = event["Caller-Orig-Caller-ID-Name"].rsplit("_", 1)[0]
-    language = event["Caller-Orig-Caller-ID-Name"].rsplit("_", 1)[1]
+    callerOrigCallerIdName, language = event["Caller-Orig-Caller-ID-Name"].rsplit("_", 1)
     callerId = callerOrigCallerIdName.partition("-bbbID-")[0]
     callerUsername = callerOrigCallerIdName.partition("-bbbID-")[2]
     socket_adress = "ws://" + server + ":" + ws_port + "/" + \
