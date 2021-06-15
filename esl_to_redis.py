@@ -27,21 +27,27 @@ def add_member(event):
     uuid = event["Unique-ID"]
     Event = "add-member"
     callerDestinationNumber = event["Caller-Destination-Number"].replace("echo", "")
-    CallerOrigCallerIDName = event["Caller-Orig-Caller-ID-Name"]
-    CallerID = CallerOrigCallerIDName.partition("-bbbID-")[0]
-    callerUsername = CallerOrigCallerIDName.partition("-bbbID-")[2]
+    callerOrigCallerIdName = event["Caller-Orig-Caller-ID-Name"].rsplit("_", 1)[0]
+    language = event["Caller-Orig-Caller-ID-Name"].rsplit("_", 1)[1]
+    callerId = callerOrigCallerIdName.partition("-bbbID-")[0]
+    callerUsername = callerOrigCallerIdName.partition("-bbbID-")[2]
     socket_adress = "ws://" + server + ":" + ws_port + "/" + \
                     callerDestinationNumber + "/" + \
-                    parse.quote(CallerOrigCallerIDName)
+                    parse.quote(callerOrigCallerIdName)
     app.command(command="uuid_audio_fork " + uuid + " start " + socket_adress + " mono 16k", background=False)
+    if language == "E":
+        language = "English"
+    else:
+        language = "German"
 
     add_member = {
                   "Event": Event,
                   "Caller-Destination-Number": callerDestinationNumber,
-                  "Caller-Orig-Caller-ID-Name": CallerOrigCallerIDName,
-                  "Caller-ID": CallerID,
+                  "Caller-Orig-Caller-ID-Name": callerOrigCallerIdName,
+                  "Caller-ID": callerId,
                   "Caller-Username": callerUsername,
-                  "UUID": uuid
+                  "UUID": uuid,
+                  "Language": language
                  }
     send_to_pubsub(add_member)
 
