@@ -14,9 +14,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def start_kaldi(server, input, output, controlChannel, speaker):
+def start_kaldi(server, input, output, controlChannel, speaker, language):
+    if language == "German":
+        model = "kaldi_tuda_de_nnet3_chain2.yaml"
+        kaldiDir = "kms_env/bin/python3 nnet3_model.py -m 0 -e -t -y models/%s --redis-server=%s --redis-audio=%s --redis-channel=%s --redis-control=%s -s='%s' -fpc 190" % (model, server, input, output, controlChannel, speaker)
+    else:
+        onlineConf = "en_160k_nnet3chain_tdnn1f_2048_sp_bi/conf/online.conf"
+        model = "en_160k_nnet3chain_tdnn1f_2048_sp_bi.yaml"
+        kaldiDir = "kms_env/bin/python3 nnet3_model.py -m 0 -e -t -o models/%s -y models/%s --redis-server=%s --redis-audio=%s --redis-channel=%s --redis-control=%s -s='%s' -fpc 190" % (onlineConf, model, server, input, output, controlChannel, speaker)
     chDir = "/home/6geislin/kaldi-model-server"
-    kaldiDir = "kms_env/bin/python3.7 nnet3_model.py -m 0 -e -t -y models/kaldi_tuda_de_nnet3_chain2.yaml --redis-server=%s --redis-audio=%s --redis-channel=%s --redis-control=%s -s='%s' -fpc 190" % (server, input, output, controlChannel, speaker)
     os.chdir(chDir)
     os.system(kaldiDir)
 
@@ -34,6 +40,7 @@ def wait_for_channel(server, port, channel):
                 message = json.loads(message["data"].decode("UTF-8"))
                 print(message)
                 callerUsername = message["Caller-Username"]
+                language = message["Language"]
                 audioChannel = message["Audio-Channel"]
                 textChannel = message["Text-Channel"]
                 controlChannel = message["Control-Channel"]
@@ -41,17 +48,17 @@ def wait_for_channel(server, port, channel):
                 origCallerIDName = message["Caller-Orig-Caller-ID-Name"]
                 if message["Event"] == "LOADER_START":
                     print("Start Kaldi")
-                    p = mp.Process(target=start_kaldi, args=(server, audioChannel, textChannel, controlChannel, callerUsername))
+                    p = mp.Process(target=start_kaldi, args=(server, audioChannel, textChannel, controlChannel, callerUsername, language))
                     p.start()
                     # kaldiInstances[audioChannel] = p
-                    redis_channel_message(red, channel, "KALDI_START", callerDestinationNumber, origCallerIDName, callerUsername, audioChannel, textChannel, controlChannel)
+                    redis_channel_message(red, channel, "KALDI_START", callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, textChannel, controlChannel)
                     
                 if message["Event"] == "LOADER_STOP":
                     audioChannel = message["Audio-Channel"]
                     controlChannel = message["Control-Channel"]
                     
                     kaldi_shutdown(red, audioChannel, controlChannel)
-                    redis_channel_message(red, channel, "KALDI_STOP", callerDestinationNumber, origCallerIDName, callerUsername, audioChannel, textChannel, controlChannel)
+                    redis_channel_message(red, channel, "KALDI_STOP", callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, textChannel, controlChannel)
                 
         except Exception as e:
             print(e)
@@ -59,7 +66,6 @@ def wait_for_channel(server, port, channel):
 
 
 def kaldi_shutdown(red, audioChannel, controlChannel):
-    print(controlChannel)
     logger.info("Stop Kaldi")
     red.publish(controlChannel, "shutdown")
     time.sleep(0.5)
@@ -67,12 +73,13 @@ def kaldi_shutdown(red, audioChannel, controlChannel):
     time.sleep(0.5)
     red.publish(audioChannel, 8*"\x00")
 
-def redis_channel_message(red, channel, Event, callerDestinationNumber, origCallerIDName, callerUsername, inputChannel, outputChannel, controlChannel):
+def redis_channel_message(red, channel, Event, callerDestinationNumber, origCallerIDName, callerUsername, language, inputChannel, outputChannel, controlChannel):
     message = {
                 "Event": Event,
                 "Caller-Destination-Number": callerDestinationNumber,
                 "Caller-Orig-Caller-ID-Name": origCallerIDName,
                 "Caller-Username": callerUsername,
+                "Language": language,
                 "Audio-Channel": inputChannel,
                 "Text-Channel": outputChannel,
                 "Control-Channel": controlChannel
