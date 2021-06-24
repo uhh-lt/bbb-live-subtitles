@@ -8,8 +8,6 @@ from urllib import parse
 
 from subtitles import subtitles
 
-myclient = pymongo.MongoClient("mongodb://127.0.1.1:27017")
-
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s %(levelname)s %(message)s',
@@ -17,24 +15,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# REDIS #
-red = redis.Redis(host="localhost", port=6379, password="")
-pubsub = red.pubsub(ignore_subscribe_messages=True)
-pubsub.subscribe("asr_channel", "from-akka-apps-redis-channel")
-
-mydb = myclient["meteor"]["captions"]
-
 class mongodbconnector:
 
-    def __init__(self):
+    def __init__(self, mongodbHost = "127.0.1.1:27017", redisHost = "localhost", asrChannel = "asr_channel"):
+        # MongoDB
+        self.myclient = pymongo.MongoClient("mongodb://" + mongodbHost)
+        self.mydb = self.myclient["meteor"]["captions"]
+        
+        # REDIS
+        red = redis.Redis(host=redisHost, port=6379, password="")
+        self.pubsub = red.pubsub(ignore_subscribe_messages=True)
+        self.pubsub.subscribe(asrChannel, "from-akka-apps-redis-channel")
+        
         self.meetings = {}
         self.lastTimestamp = 0
         self.the_loop()
+        
 
     def the_loop(self):
-        meetings = self.meetings
         while True:
-            fullmessage = pubsub.get_message()
+            fullmessage = self.pubsub.get_message()
             if fullmessage:
                 event, textChannel, userId, voiceConf, meetingId, callerName, language, utterance = self.read_message(fullmessage)
                 # print(fullmessage)
@@ -43,12 +43,12 @@ class mongodbconnector:
                 if event == "KALDI_START":  # TODO: Message to Redis
                     logger.info("Kaldi is started. Lets get ASR!")
                     self.dict_handler(userId, callerName, language, voiceConf, TextChannel=textChannel)
-                    pubsub.subscribe(textChannel)
+                    self.pubsub.subscribe(textChannel)
                 if event == "KALDI_STOP":  # TODO: Message to Redis
                     logger.info("Kaldi is stopped. Unsubscribe channel")
-                    pubsub.unsubscribe(textChannel)
+                    self.pubsub.unsubscribe(textChannel)
                 if event == "partialUtterance" or event == "completeUtterance":
-                    meetings[voiceConf]["subtitles"].insert(userId=userId, callerName=callerName, utterance=utterance, event=event)
+                    self.meetings[voiceConf]["subtitles"].insert(userId=userId, callerName=callerName, utterance=utterance, event=event)
                     # print(meetings[voiceConf]["subtitles"].list())
                     # send_utterance(meetings, voiceConf, callerName, utterance)
                     self.send_subtitle(voiceConf)
@@ -122,8 +122,8 @@ class mongodbconnector:
     def check_chat(self, meetingId):
         lastTimestamp = self.lastTimestamp
         myquery2 = {"$and": [{"timestamp": { "$gt" : lastTimestamp}}, {"meetingId" : meetingId}]}
-        mydb = myclient["meteor"]["group-chat-msg"]
-        v = mydb.find(myquery2)
+        self.mydb = self.myclient["meteor"]["group-chat-msg"]
+        v = self.mydb.find(myquery2)
         for a in v:        
             if lastTimestamp < a["timestamp"]:
                 lastTimestamp = a["timestamp"]
@@ -134,7 +134,7 @@ class mongodbconnector:
 
     def get_meeting_pad(self, meetingId):
         myquery = {"$and": [{"meetingId": meetingId}, {"locale.locale": "en"}]}
-        v = mydb.find_one(myquery)
+        v = self.mydb.find_one(myquery)
         if v is None:
             return None
         else:
@@ -161,10 +161,10 @@ class mongodbconnector:
         if subtitle is not None:
             logger.debug(subtitle)
             myquery = {"$and": [{"_id": pad}, {"locale.locale": "en"}]}
-            v = mydb.find_one(myquery)
+            v = self.mydb.find_one(myquery)
             revs = v["revs"]
             length = v["length"]
-            mydb.update({
+            self.mydb.update({
                 '_id': pad
             }, {
                 '$set': {
