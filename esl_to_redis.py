@@ -6,12 +6,12 @@ import logging
 import argparse
 from urllib import parse
 
-server = 'ltbbb2'
+server = 'YOUR BBB SERVER'
 ws_port = '3001'
 asr_channel = 'asr_channel'
 
 # TODO: Add parameter to both
-app = Jaspion(host='127.0.0.1', port=8021, password='597a18d86f70e14c')
+app = Jaspion(host='127.0.0.1', port=8021, password='YOUR FREESWITCH PASSWORD')
 red = redis.Redis(host=server, port=6379, password='')
 
 logging.basicConfig()
