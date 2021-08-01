@@ -12,7 +12,7 @@ asr_channel = 'asr_channel'
 
 # TODO: Add parameter to both
 app = Jaspion(host='127.0.0.1', port=8021, password='597a18d86f70e14c')
-red = redis.Redis(host='localhost', port=6379, password='')
+red = redis.Redis(host=server, port=6379, password='')
 
 logging.basicConfig()
 logger = logging.getLogger('ESL-Bridge')
@@ -36,7 +36,6 @@ def add_member(event):
                     parse.quote(callerOrigCallerIdName)
     app.command(command='uuid_audio_fork ' + uuid + ' start ' + socket_adress + ' mono 16k', background=False)
     if language.startswith('E'):
-        print("hi")
         language = 'English'
     else:
         language = 'German'
