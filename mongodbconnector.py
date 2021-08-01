@@ -31,12 +31,11 @@ class mongodbconnector:
         self.pubsub.subscribe(asrChannel, 'from-akka-apps-redis-channel', 'to-voice-conf-redis-channel')
         
         # Etherpad
-        self.etherpadKey='YOUR ETHERPAD KEY'
+        self.etherpadKey='aM2Yobvcyo2RIDftgne7aJJaOFTmlKJf2c7HJK2qnX0J5NeJgirqgVCkwPzUk2'
         self.myPad = EtherpadLiteClient(self.etherpadKey)
 
         self.meetings = {}
         self.lastTimestamp = 0
-        self.ptwo = ''
         self.message = {}
 
         self.the_loop()
@@ -55,11 +54,9 @@ class mongodbconnector:
                         self.firstMessage()
                 if event == 'VoiceCallStateEvtMsg~IN_CONFERENCE':
                     self.dict_handler()
-                    print('DebugTime!!!')
-                    print(message)
                 if event == 'GetUsersInVoiceConfSysMsg':
                     self.dict_handler()
-                if event == 'KALDI_START':  # TODO: Message to Redis # Mit Zahl
+                if event == 'KALDI_START':  # TODO: Message to Redis
                     logger.info('Kaldi is started. Lets get ASR!')
                     self.dict_handler()
                     self.pubsub.subscribe(message['textChannel'])
@@ -73,35 +70,26 @@ class mongodbconnector:
                     utterance = message['utterance']
                     meetingId = self.get_meetingId(voiceConf)
                     self.meetings[meetingId]['subtitles'].insert(userId=userId, callerName=callerName, utterance=utterance, event=event)
-                    # print(meetings[voiceConf]['subtitles'].list())
-                    # send_utterance(meetings, voiceConf, callerName, utterance)
                     self.send_subtitle(meetingId)
                     self.appendEtherPad()
                 self.message = {}
             time.sleep(0.1)
                 
 
-    # def calculateEtherPadId(self, meetingId):
-    #     id = meetingId + self.etherpadKey
-    #     return hashlib.sha1(id.encode('utf-8')).hexdigest()
-
     def firstMessage(self):
-        etherPadId = self.ptwo
+        meetingId = self.message["meetingId"]
+        etherPadId = self.meetings[meetingId]['etherPadId']
         myPad = self.myPad
 
         myPad.appendText(etherPadId, '\r\n\r\n\r\n\r\n-----\r\nUntertitel:\r\n-----\r\n')
 
 
     def appendEtherPad(self):
-        # utterance = self.message['utterance']
         voiceConf = self.message['voiceConf']
         meetingId = self.get_meetingId(voiceConf)
         etherPadId = self.meetings[meetingId]['etherPadId']
         subtitles = self.meetings[meetingId]['subtitles']
         utterance = subtitles.latest()
-        # print(utterance)
-        # etherPadId = d['etherPadId']
-        # subtitles = d['subtitles']
         myPad = self.myPad
         if utterance:
             for utt in utterance:
@@ -141,7 +129,6 @@ class mongodbconnector:
                     message['event'] = messageJson['header']['name']
                     message['meetingId'] = messageJson['header']['meetingId']
                     message['etherPadId'] = messageJson['body']['padId']
-                    self.ptwo = message['etherPadId']
         if 'handle' in messageJson.keys():  # kaldi-model-server messages
             message['event'] = messageJson['handle']
             fullmessage = parse.unquote(fullmessage['channel'].decode('utf-8'))
