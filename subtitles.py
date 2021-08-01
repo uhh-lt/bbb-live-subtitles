@@ -5,16 +5,18 @@ import threading
 
 class subtitles:
 
-    def __init__(self, voiceConf):
-        self.voiceConf = voiceConf
+    def __init__(self, meetingId):
+        self.meetingId = meetingId
         self.subtitles = OrderedDict()
+        self.completeSubtitles = []
+        self.lastPointSubtitles = 0
 
         maintenance = threading.Thread(target=self.__subtitleMaintenance__, args=())
         maintenance.daemon = True
         maintenance.start()
 
     def __subtitleMaintenance__(self):
-        durationSubtitle = 0  
+        durationSubtitle = 0
         while True:
             subtitles = self.subtitles
             actualTime = time.time()
@@ -36,7 +38,7 @@ class subtitles:
         else:
             return one["callerName"] + ": " + one["subtitle"] + "\n"
 
-    def insert(self, userId, callerName, utterance, priority=0):
+    def insert(self, userId, callerName, utterance, event, priority=0):
         actualTime = time.time()
         subtitles = self.subtitles
         subtitle = self.__utteranceToSubtitle__(utterance)
@@ -47,6 +49,8 @@ class subtitles:
                               "time": actualTime,
                               "priority": priority
                             }
+            if event == "completeUtterance":
+                self.completeSubtitles.append(callerName + ": " + subtitle )
         return subtitles
 
     def show(self):
@@ -69,13 +73,25 @@ class subtitles:
     def list(self):
         print(self.subtitles)
 
+    def latest(self):
+        """returns the latest completed subtitles else None"""
+        lastPointSubtitles = self.lastPointSubtitles
+        
+        if len(self.completeSubtitles) is not lastPointSubtitles:
+            result = self.completeSubtitles[lastPointSubtitles:]
+            self.lastPointSubtitles = len(self.completeSubtitles)
+
+            return result
+        else:
+            return None
+
 
 if __name__ == "__main__":
     st = subtitles(123)
-    st.insert(456, "John Doe", "Franz jagt im <UNK> Taxi quer       ähm durch wow äh Bayern    ")
+    st.insert(456, "John Doe", "Franz jagt im <UNK> Taxi quer       ähm durch wow äh Bayern    ", "partialUtterance")
     time.sleep(1)
     st.list()
-    st.insert(111, "Johanna Doe", "Franziska jagt   im völlig verwahrlosten <UNK> quer durch ähhh München", 0)
+    st.insert(111, "Johanna Doe", "Franziska jagt   im völlig verwahrlosten <UNK> quer durch ähhh München", "completeUtterance", 0)
     time.sleep(1)
     st.insert(777, "Alice", "Ferdi Fuchs", 0)
     time.sleep(1)

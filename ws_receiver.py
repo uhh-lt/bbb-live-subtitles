@@ -25,9 +25,12 @@ async def socket_to_redis(websocket, path):
     callerDestinationNumber = path.split("/")[0]
     origCallerIDName = path.split("/")[1]
     callerUsername = origCallerIDName.split("-bbbID-")[1]
-    language = origCallerIDName.split("-bbbID-")[1].rsplit("_", 1)[1]
-    if language == "E":
-        language = "English"
+    if len(origCallerIDName.split("-bbbID-")[1].rsplit("_", 1)) > 1:
+        language = origCallerIDName.split("-bbbID-")[1].rsplit("_", 1)[1]
+        if  language.startswith("E"):
+            language = "English"
+        else:
+            language = "German"
     else:
         language = "German"
     audioChannel = parse.quote(callerDestinationNumber + "~" + origCallerIDName) + "~audio"
