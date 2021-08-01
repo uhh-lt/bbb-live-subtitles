@@ -26,7 +26,7 @@ async def socket_to_redis(websocket, path):
     origCallerIDName = path.split('/')[1]
     callerUsername = origCallerIDName.split('-bbbID-')[1]
     if len(origCallerIDName.split('-bbbID-')[1].rsplit('_', 1)) > 1:
-        language = origCallerIDName.split('-bbbID-')[1].rsplit('_', 1)[1]
+        language = origCallerIDName.split('-bbbID-')[1].rsplit('_', 1)[1].capitalize()
         if  language.startswith('E'):
             language = 'English'
         else:

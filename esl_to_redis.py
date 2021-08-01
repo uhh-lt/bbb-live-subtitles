@@ -6,12 +6,12 @@ import logging
 import argparse
 from urllib import parse
 
-server = 'YOUR BBB SERVER'
+server = 'ltbbb2'
 ws_port = '3001'
 asr_channel = 'asr_channel'
 
 # TODO: Add parameter to both
-app = Jaspion(host='127.0.0.1', port=8021, password='YOUR FREESWITCH PASSWORD')
+app = Jaspion(host='127.0.0.1', port=8021, password='597a18d86f70e14c')
 red = redis.Redis(host='localhost', port=6379, password='')
 
 logging.basicConfig()
@@ -28,14 +28,15 @@ def add_member(event):
     Event = 'add-member'
     callerDestinationNumber = event['Caller-Destination-Number'].replace('echo', '')
     callerOrigCallerIdName = event['Caller-Orig-Caller-ID-Name']
-    language = event['Caller-Orig-Caller-ID-Name'].rsplit('_', 1)[1]
+    language = event['Caller-Orig-Caller-ID-Name'].rsplit('_', 1)[1].capitalize()
     callerId = callerOrigCallerIdName.partition('-bbbID-')[0]
     callerUsername = callerOrigCallerIdName.partition('-bbbID-')[2]
     socket_adress = 'ws://' + server + ':' + ws_port + '/' + \
                     callerDestinationNumber + '/' + \
                     parse.quote(callerOrigCallerIdName)
     app.command(command='uuid_audio_fork ' + uuid + ' start ' + socket_adress + ' mono 16k', background=False)
-    if language == 'E':
+    if language.startswith('E'):
+        print("hi")
         language = 'English'
     else:
         language = 'German'
