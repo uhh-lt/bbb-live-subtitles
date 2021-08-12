@@ -3,7 +3,7 @@ import time
 import redis
 import json
 import logging
-import hashlib
+import argparse
 from py_etherpad import EtherpadLiteClient
 
 # import argparse
@@ -20,18 +20,17 @@ logger = logging.getLogger(__name__)
 
 class mongodbconnector:
 
-    def __init__(self, mongodbHost = '127.0.1.1:27017', redisHost = 'localhost', asrChannel = 'asr_channel'):
+    def __init__(self, etherpadKey, asrChannel, redisHost, mongodbHost = '127.0.1.1:27017'):
         # MongoDB
         self.myclient = pymongo.MongoClient('mongodb://' + mongodbHost)
         self.mydb = self.myclient['meteor']['captions']
-        
         # REDIS
         red = redis.Redis(host=redisHost, port=6379, password='')
         self.pubsub = red.pubsub(ignore_subscribe_messages=True)
         self.pubsub.subscribe(asrChannel, 'from-akka-apps-redis-channel', 'to-voice-conf-redis-channel')
         
         # Etherpad
-        self.etherpadKey='aM2Yobvcyo2RIDftgne7aJJaOFTmlKJf2c7HJK2qnX0J5NeJgirqgVCkwPzUk2'
+        self.etherpadKey= etherpadKey
         self.myPad = EtherpadLiteClient(self.etherpadKey)
 
         self.meetings = {}
@@ -83,7 +82,6 @@ class mongodbconnector:
 
         myPad.appendText(etherPadId, '\r\n\r\n\r\n\r\n-----\r\nUntertitel:\r\n-----\r\n')
 
-
     def appendEtherPad(self):
         voiceConf = self.message['voiceConf']
         meetingId = self.get_meetingId(voiceConf)
@@ -95,7 +93,6 @@ class mongodbconnector:
             for utt in utterance:
                 myPad.appendText(etherPadId, utt + '\r\n')
         
-
     def read_message(self, fullmessage):
         '''
         There are main sources for messages: bbb-live-subtitles, BBB-core, from-etherpad-redis-channel and kaldi-model-server.
@@ -203,7 +200,6 @@ class mongodbconnector:
         mongoDbPad = message.get('pad')
         etherPadId = message.get('etherPadId')
 
-
         d = self.meetings
         print('print d')
         print(d)
@@ -225,39 +221,6 @@ class mongodbconnector:
             d[voiceConf]['mongoDbPad'] = mongoDbPad
         if etherPadId:
             d[voiceConf]['etherPadId'] = etherPadId
-
-    def check_chat(self, meetingId):
-        lastTimestamp = self.lastTimestamp
-        myquery2 = {'$and': [{'timestamp': { '$gt' : lastTimestamp}}, {'meetingId' : meetingId}]}
-        self.mydb = self.myclient['meteor']['group-chat-msg']
-        v = self.mydb.find(myquery2)
-        for a in v:        
-            if lastTimestamp < a['timestamp']:
-                lastTimestamp = a['timestamp']
-            if a == 'PDFExport':
-                return a
-        return None
-
-    def read_chat_true(self, meetingId):
-        lastTimestamp = 0
-        while True:
-            queryChat = {'$and': [{'timestamp': { '$gt' : lastTimestamp}}, {'meetingId' : meetingId}]}
-            self.mydb = self.myclient['meteor']['group-chat-msg']
-            v = self.mydb.find(queryChat)
-            for a in v:
-                print(a)
-                if lastTimestamp < a['timestamp']:
-                    lastTimestamp = a['timestamp']
-                if a == '!PDFExport':
-                    return a
-                if a == '!Language':
-                    return a
-                if a == '!Help':
-                    print('Help Menu for BBB-live-subtitles. /n !PDFExport - Get the complete Subtitles of the meeting /n !Start USER - Start Subtitling for the User /n !Stop USER - Stop Subtitling for the User')
-                    self.mydb.insert_one({})
-            
-            return None
-
 
     def get_meeting_pad(self, meetingId):
         myquery = {'$and': [{'meetingId': meetingId}, {'locale.locale': 'de'}]}
@@ -304,5 +267,12 @@ class mongodbconnector:
 
 
 if __name__ == '__main__':
-    mongo = mongodbconnector()
-    # the_loop()
+    # Argument Parser
+    parser = argparse.ArgumentParser()
+
+    # # flag (- and --) arguments
+    parser.add_argument('-s', '--server', help='REDIS Pubsub Server hostname or IP', default='localhost')
+    parser.add_argument('-c', '--channel', help='The Pubsub Information Channel', default='asr_channel')
+    parser.add_argument('-e', '--etherpadKey', help='etherpad API Key', required=True)
+    args = parser.parse_args()
+    mongo = mongodbconnector(etherpadKey=args.etherpadKey, asrChannel=args.channel, redisHost=args.server)
