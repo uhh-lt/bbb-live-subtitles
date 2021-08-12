@@ -3,6 +3,8 @@ import websockets
 import redis
 import json
 import logging
+import time
+from threading import Thread
 from urllib import parse
 
 port = '3001'
@@ -24,10 +26,12 @@ async def socket_to_redis(websocket, path):
     logger.info('Connected to: ' + path)
     callerDestinationNumber = path.split('/')[0]
     origCallerIDName = path.split('/')[1]
+    voiceUserId = origCallerIDName.split('_')
+    voiceUserId = voiceUserId[0] + '_' + voiceUserId[1]
     callerUsername = origCallerIDName.split('-bbbID-')[1]
     if len(origCallerIDName.split('-bbbID-')[1].rsplit('_', 1)) > 1:
         language = origCallerIDName.split('-bbbID-')[1].rsplit('_', 1)[1].capitalize()
-        if  language.startswith('E'):
+        if language.startswith('E'):
             language = 'English'
         else:
             language = 'German'
@@ -37,9 +41,19 @@ async def socket_to_redis(websocket, path):
     controlChannel = parse.quote(callerDestinationNumber + '~' + origCallerIDName) + '~control'
     textChannel = parse.quote(callerDestinationNumber + '~' + origCallerIDName) + '~text'
     redis_message('LOADER_START', callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, controlChannel, textChannel)
-
+    
+    wasTalkingChunks = 0 
+    wasTalking = None # This is to send some more data chunks to help kaldi finalize the last utterance
     async for message in websocket:
-        red.publish(audioChannel, message)
+        if voiceUserId in isTalking:
+            red.publish(audioChannel, message)
+            wasTalking = voiceUserId
+            wasTalkingChunks = 100 # this number is a guess. To small and Kaldi doesn't complete the utterance. 
+        elif (voiceUserId == wasTalking) and (wasTalkingChunks > 0):
+            red.publish(audioChannel, message)
+            wasTalkingChunks -= 1
+            if wasTalkingChunks == 0:
+                wasTalking = None
     logger.info('Connection %s closed' % path)
     redis_message('LOADER_STOP', callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, controlChannel, textChannel)
 
@@ -58,8 +72,30 @@ def redis_message(event, callerDestinationNumber, origCallerIDName, callerUserna
     logger.info(message)
     red.publish(asr_channel, json.dumps(message))
 
+def maintain_isTalking(): # The idea is to only send data into the database while the person is talking. This should perform way better with multiple silent persons
+    pubsub = red.pubsub(ignore_subscribe_messages=True)
+    pubsub.subscribe('from-akka-apps-redis-channel')
+    global isTalking
+    isTalking = set()
+    while True:
+        message = pubsub.get_message()
+        if message:
+            message = json.loads(message['data'].decode('UTF-8'))
+            core = message.get('core')
+            event = core['header']['name']
+            if event == 'UserTalkingVoiceEvtMsg':
+                if core['body']['talking'] == True:
+                    isTalking.add(core['body']['voiceUserId'])
+                else:
+                    isTalking.discard(core['body']['voiceUserId'])
+            # print(talking)
+        time.sleep(0.1)
 
-start_server = websockets.serve(socket_to_redis, 'YOUR BBB SERVER', port)
+mti = Thread(target=maintain_isTalking)
+mti.deamon = True
+mti.start()
+
+start_server = websockets.serve(socket_to_redis, 'localhost', port)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 logger.info('Websocket Server started on Port ' + port)
