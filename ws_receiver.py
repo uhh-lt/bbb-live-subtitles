@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 red = redis.Redis(host='localhost', port=6379, password='')
 
-
+wasTalking = dict() # This is to send some more data chunks to help kaldi finalize the last utterance
 async def socket_to_redis(websocket, path):
     path = parse.unquote(path[1:])
     logger.info('Websocket Connection established')
@@ -41,19 +41,20 @@ async def socket_to_redis(websocket, path):
     controlChannel = parse.quote(callerDestinationNumber + '~' + origCallerIDName) + '~control'
     textChannel = parse.quote(callerDestinationNumber + '~' + origCallerIDName) + '~text'
     redis_message('LOADER_START', callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, controlChannel, textChannel)
-    
     wasTalkingChunks = 0 
-    wasTalking = None # This is to send some more data chunks to help kaldi finalize the last utterance
     async for message in websocket:
         if voiceUserId in isTalking:
             red.publish(audioChannel, message)
-            wasTalking = voiceUserId
-            wasTalkingChunks = 100 # this number is a guess. To small and Kaldi doesn't complete the utterance. 
-        elif (voiceUserId == wasTalking) and (wasTalkingChunks > 0):
+            wasTalkingChunks = 200 # this number is a guess. To small and Kaldi doesn't complete the utterance. 
+            wasTalking[voiceUserId] = wasTalkingChunks
+        if wasTalking.get(voiceUserId):
             red.publish(audioChannel, message)
-            wasTalkingChunks -= 1
-            if wasTalkingChunks == 0:
-                wasTalking = None
+            wasTalking[voiceUserId] -= 1
+        if wasTalking[voiceUserId] == 0:
+            wasTalking.pop(voiceUserId)
+        print(wasTalking)
+        
+
     logger.info('Connection %s closed' % path)
     redis_message('LOADER_STOP', callerDestinationNumber, origCallerIDName, callerUsername, language, audioChannel, controlChannel, textChannel)
 
