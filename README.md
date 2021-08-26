@@ -21,8 +21,8 @@ cd bbb-live-subtitles/
 
 # create the virtual environment and install the dependencies
 virtualenv -p /usr/bin/python3.8 bbbsub_env
-source bbbsub_env
-pip install redis pymongo jaspion pyyaml pyaudio samplerate scipy pyetherpadlite
+source bbbsub_env/bin/activate
+pip install redis pymongo jaspion pyyaml pyaudio samplerate scipy pyetherpadlite websockets
 
 # Clone Kaldi-Model-Server
 git clone https://github.com/uhh-lt/kaldi-model-server.git
@@ -98,12 +98,12 @@ To use the script you need to add your Server and API Keys.
 ## esl_to_redis
 Add in line 9 your BBB hostname (or localhost).
 Add in line 14 your Freeswitch password.
-The password is stored in the file "/opt/freeswitch/etc/freeswitch/autoload_configs/event_socket.conf.xml"
+The password is stored in the file `/opt/freeswitch/etc/freeswitch/autoload_configs/event_socket.conf.xml`
 ## ws_receiver
 Add in line 62 your BBB hostname (or localhost).
 ## mongodbconnector
 To run the mongodbconnector you need to get the Etherpad API Key.
-The Key is stored in /usr/share/etherpad-lite/APIKEY.txt
+The Key is stored in `/usr/share/etherpad-lite/APIKEY.txt`
 
 
 # Usage
@@ -126,6 +126,8 @@ Start `mongodbconnector.py` with your parameters:
 ```Shell
 python3 mongodbconnector.py -s BBB_SERVER -c asr_channel -e ETHERPAD_API_KEY
 ```
+To run all scripts except Kaldi you can also adapt and use the script `run.sh`. It runs `es_to_redis`, `ws_receiver` and `mongodbconnector` in one tmux session.
+
 
 # Activate Subtitles in the conference
 As a moderator:
