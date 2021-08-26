@@ -3,6 +3,7 @@ This project is a plugin for automatic subtitling in BigBlueButton (BBB), an ope
 
 # Subtitling of BBB Participants
 Currently, each BBB participant is subtitled individually. We use Kaldi/pyKaldi for automatic speech recognition (ASR). Any nnet3 compatible Kaldi model can be used. We offer free and ready to use models for [German ASR](https://github.com/uhh-lt/kaldi-tuda-de/) and an English model is available as well.
+Also the subtitles are written into the Shared Notes and can be exported as PDF or a Word Document.
 
 # Installation and prerequisites:
 Tested with BigBlueButton 2.2.x, Ubuntu 20.04, Python 3.8 and [kaldi-model-server](https://github.com/uhh-lt/kaldi-model-server)
@@ -21,7 +22,7 @@ cd bbb-live-subtitles/
 # create the virtual environment and install the dependencies
 virtualenv -p /usr/bin/python3.8 bbbsub_env
 source bbbsub_env
-pip install redis pymongo jaspion pyyaml pyaudio samplerate scipy
+pip install redis pymongo jaspion pyyaml pyaudio samplerate scipy pyetherpadlite
 
 # Clone Kaldi-Model-Server
 git clone https://github.com/uhh-lt/kaldi-model-server.git
@@ -30,8 +31,8 @@ git clone https://github.com/uhh-lt/kaldi-model-server.git
 # Download the PyKaldi wheel and install it
 
 # PyKaldi 0.2.0:
-wget http://ltdata1.informatik.uni-hamburg.de/pykaldi/pykaldi-0.2.0-cp38-cp38-linux_x86_64.whl
-pip install pykaldi-0.2.0-cp38-cp38-linux_x86_64.whl
+wget http://ltdata1.informatik.uni-hamburg.de/pykaldi_tmp/pykaldi-0.2.1-cp38-cp38-linux_x86_64.whl
+pip install pykaldi-0.2.1-cp38-cp38-linux_x86_64.whl
 
 # Install Kaldi and Intel MKL (see note below if you have a different CPU than Intel)
 ./install_mkl.sh
@@ -92,6 +93,19 @@ Save the changes and restart freeswitch:
 sudo service freeswitch restart
 ```
 
+# Add your Server and Keys to the script
+To use the script you need to add your Server and API Keys.
+## esl_to_redis
+Add in line 9 your BBB hostname (or localhost).
+Add in line 14 your Freeswitch password.
+The password is stored in the file "/opt/freeswitch/etc/freeswitch/autoload_configs/event_socket.conf.xml"
+## ws_receiver
+Add in line 62 your BBB hostname (or localhost).
+## mongodbconnector
+To run the mongodbconnector you need to get the Etherpad API Key.
+The Key is stored in /usr/share/etherpad-lite/APIKEY.txt
+
+
 # Usage
 To use this project you can run every script on remote machines or if your machine is fast enough all services on the same machine.
 All the scripts need to run before the participants join the conference. ASR processing is only loaded once it is needed, otherwise the script stand by and wait for participants to join conferences. After the participant leaves the conference or leaves the audio of the conference the ASR stops. When the participant joins back the audio with microphone the ASR starts.
@@ -107,7 +121,11 @@ The `kaldi_starter.py` module is in this configuration on another machine (could
 python3 kaldi_starter.py -s server -c asr_channel
 ```
 
-With the `mongodbconnector.py` module the ASR Data is written into the mongodb database. To see subtitles, the presenter needs to start the subtitle functionanilty in BBB and then the participants can activate the subtitles by clicking on the CC button.
+With the `mongodbconnector.py` module the ASR Data is written into the mongodb database and into the Notes. To see subtitles, the presenter needs to start the subtitle functionanilty in BBB and then the participants can activate the subtitles by clicking on the CC button.
+Start `mongodbconnector.py` with your parameters:
+```Shell
+python3 mongodbconnector.py -s BBB_SERVER -c asr_channel -e ETHERPAD_API_KEY
+```
 
 # Activate Subtitles in the conference
 As a moderator:
