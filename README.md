@@ -170,3 +170,17 @@ sudo service freeswitch restart
 
 # Problems / Questions / Suggestions?
 Feel free to write an issue, pull-request or a mail :)
+
+## Citation
+
+If you use the plugin, please cite our [paper](./Bigbluebutton_paper.pdf?raw=true):
+
+```
+@inproceedings{geislinger21_interspeech,
+  author={Robert Geislinger and Benjamin Milde and Timo Baumann and Chris Biemann},
+  title={{Live Subtitling for BigBlueButton with Open-Source Software}},
+  year=2021,
+  booktitle={Proc. Interspeech 2021},
+  pages={3319--3320}
+}
+```
