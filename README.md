@@ -181,6 +181,7 @@ If you use the plugin, please cite our [paper](./Bigbluebutton_paper.pdf?raw=tru
   title={{Live Subtitling for BigBlueButton with Open-Source Software}},
   year=2021,
   booktitle={Proc. Interspeech 2021},
-  pages={3319--3320}
+  pages={3319--3320},
+  address={Brno, Czech Republic}
 }
 ```
