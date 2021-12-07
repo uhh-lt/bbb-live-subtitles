@@ -1,5 +1,8 @@
 # bbb-live-subtitles
-This project is a plugin for automatic subtitling in BigBlueButton (BBB), an open source web conferencing system. bbb-live-subtitles will run real time automatic speech recognition (ASR) and will generate subtitle captions on-the-fly. No cloud services are used for ASR, instead we use our own speech recognition models that can be run locally. This ensures that no privacy issues arise. There are a german and english model already build and ready to use (english runs only with pykaldi > 0.2.0 and Python 3.8)
+This project is a plugin for automatic subtitling in BigBlueButton (BBB), an open source web conferencing system. bbb-live-subtitles will run real time automatic speech recognition (ASR) and will generate subtitle captions on-the-fly. No cloud services are used for ASR, instead we use our own speech recognition models that can be run locally. This ensures that no privacy issues arise. There are pre-trained German and English models available and ready to use (English needs PyKaldi > 0.2.0 and Python 3.8). 
+
+# Demo video
+See our plugin in action in this [presentation video](https://ltdata1.informatik.uni-hamburg.de/bbb-live-subtitles/LiveSubtitlingBigBlueButton_English.mp4).
 
 # Subtitling of BBB Participants
 Currently, each BBB participant is subtitled individually. We use Kaldi/pyKaldi for automatic speech recognition (ASR). Any nnet3 compatible Kaldi model can be used. We offer free and ready to use models for [German ASR](https://github.com/uhh-lt/kaldi-tuda-de/) and an English model is available as well.
