@@ -14,7 +14,7 @@ Tested with BigBlueButton 2.2.x, Ubuntu 20.04, Python 3.8 and [kaldi-model-serve
 ## Install and configure BBB-live-subtitles
 ```Shell
 # Make sure you have Python 3.8 installed, its dev package and other dependencies: (Python 3.7 could work also. There is a PyKaldi wheel for 3.7 also)
-sudo apt-get install python3.8 python3.8-dev portaudio19-dev
+sudo apt-get install python3.8 python3.8-dev portaudio19-dev virtualenv automake autoconf sox gfortran libtool subversion
 
 # Now clone the bbb-live-subtitles package somewhere:
 mkdir ~/projects
@@ -45,6 +45,7 @@ pip install pykaldi-0.2.1-cp38-cp38-linux_x86_64.whl
 ./install_kaldi.sh ~/projects/bbb-live-subtitles/bbbsub_env/bin/python3.8
 
 # Download the english and german Model
+cd kaldi-model-server
 ./download_example_models.sh
 
 ```
